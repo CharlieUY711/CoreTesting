@@ -3,7 +3,34 @@
    Migrado a supabase.from() directo para evitar CORS
    ===================================================== */
 import { supabase } from '../../utils/supabase/client';
+import { MODULE_MANIFEST } from '../utils/moduleManifest';
 import { MODULES_DATA } from '../utils/modulesData';
+
+// Mapa de enriquecimiento: id (section) → datos base de MODULES_DATA
+const BASE_DATA_MAP = new Map<string, { name: string; category: string; description: string; estimatedHours?: number; submodules?: any[] }>();
+MODULES_DATA.forEach(m => {
+  BASE_DATA_MAP.set(m.id, m);
+});
+
+/** Convierte un section ID a nombre legible: 'mapa-envios' → 'Mapa Envios' */
+function sectionToName(section: string): string {
+  return section.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+/** Infiere category desde section ID */
+function sectionToCategory(section: string): string {
+  if (['dashboard','sistema','departamentos','checklist','diseno','auth-registro','config-vistas','documentacion','metamap-config'].includes(section)) return 'admin';
+  if (['personas','organizaciones','clientes'].includes(section)) return 'admin';
+  if (['ecommerce','pedidos','pagos','metodos-pago','metodos-envio','pos','storefront','secondhand','carga-masiva'].includes(section)) return 'ecommerce';
+  if (['logistica','envios','transportistas','rutas','vehiculos','depositos','inventario','entregas','fulfillment','produccion','abastecimiento','mapa-envios','tracking-publico','etiqueta-emotiva'].includes(section)) return 'logistics';
+  if (['marketing','google-ads','mailing','seo','fidelizacion','rueda-sorteos','redes-sociales','migracion-rrss','rrss','meta-business'].includes(section)) return 'marketing';
+  if (['herramientas','biblioteca','editor-imagenes','gen-documentos','gen-presupuestos','ocr','impresion','qr-generator','ideas-board','unified-workspace','google-maps-test'].includes(section)) return 'tools';
+  if (['gestion','erp-inventario','erp-facturacion','erp-compras','erp-crm','erp-contabilidad','erp-rrhh','proyectos'].includes(section)) return 'erp';
+  if (['integraciones','integraciones-pagos','integraciones-logistica','integraciones-tiendas','integraciones-rrss','integraciones-servicios','integraciones-marketplace','integraciones-comunicacion','integraciones-identidad','integraciones-api-keys','integraciones-webhooks','integraciones-apis'].includes(section)) return 'integrations';
+  if (['auditoria','auditoria-health','auditoria-logs'].includes(section)) return 'audit';
+  if (['constructor','roadmap','dashboard-admin','dashboard-usuario'].includes(section)) return 'builder';
+  return 'admin';
+}
 
 // ── Tipos ────────────────────────────────────────────────────────────────
 
@@ -175,23 +202,6 @@ async function apiPut<T>(path: string, body: any): Promise<{ ok: boolean; data?:
   }
 }
 
-async function apiDelete(path: string): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch(`${BASE}${path}`, {
-      method: 'DELETE',
-      headers: HEADERS,
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      return { ok: false, error: json.error || 'Error en la petición' };
-    }
-    return { ok: true };
-  } catch (err) {
-    console.error(`Roadmap API DELETE ${path}:`, err);
-    return { ok: false, error: String(err) };
-  }
-}
-
 // ── Módulos ───────────────────────────────────────────────────────────────
 
 export async function getModules(): Promise<RoadmapModule[]> {
@@ -224,26 +234,26 @@ export async function getModules(): Promise<RoadmapModule[]> {
       });
     });
     
-    // Combinar datos base con estado de SQL
-    // Si SQL está vacío, usar datos base con estados por defecto
-    const modules = MODULES_DATA.map((base) => {
-      const state = stateMap.get(base.id);
-      
-      // Si hay estado en SQL, combinar; si no, usar valores por defecto
+    // Iterar sobre el manifest (fuente única de verdad de secciones/vistas)
+    // y enriquecer con datos base de MODULES_DATA cuando exista match por ID legacy
+    const modules = MODULE_MANIFEST.map((entry) => {
+      const id = entry.section;
+      const state = stateMap.get(id);
+      const base = BASE_DATA_MAP.get(id);
       return {
-        id: base.id,
-        name: base.name,
-        category: base.category,
-        description: base.description,
+        id,
+        name: base?.name ?? sectionToName(id),
+        category: base?.category ?? sectionToCategory(id),
+        description: base?.description ?? entry.notes ?? '',
         status: state?.status ?? 'not-started',
         priority: state?.priority ?? 'medium',
         execOrder: state?.execOrder ?? undefined,
-        estimatedHours: state?.estimatedHours ?? base.estimatedHours ?? undefined,
+        estimatedHours: state?.estimatedHours ?? base?.estimatedHours ?? undefined,
         notas: state?.notas ?? undefined,
-        submodules: base.submodules?.map(sub => ({
+        submodules: base?.submodules?.map(sub => ({
           id: sub.id,
           name: sub.name,
-          status: state?.status ?? 'not-started', // Los submódulos heredan el estado del padre por defecto
+          status: state?.status ?? 'not-started',
           estimatedHours: sub.estimatedHours,
         })),
         tiene_view: state?.tiene_view ?? false,
@@ -325,7 +335,11 @@ export async function saveModule(moduleId: string, data: Partial<RoadmapModule>)
 }
 
 export async function resetModules(): Promise<void> {
-  await apiDelete('/modules/reset');
+  const { error } = await supabase
+    .from('roadmap_modules')
+    .delete()
+    .neq('id', '');
+  if (error) throw new Error(error.message);
 }
 
 // ── Tasks ──────────────────────────────────────────────────────────────────
@@ -349,8 +363,11 @@ export async function updateTask(taskId: string, data: Partial<TaskInput>): Prom
 }
 
 export async function deleteTask(taskId: string): Promise<void> {
-  const res = await apiDelete(`/tasks/${taskId}`);
-  if (!res.ok) throw new Error(res.error || 'Error eliminando task');
+  const { error } = await supabase
+    .from('roadmap_tasks')
+    .delete()
+    .eq('id', taskId);
+  if (error) throw new Error(error.message);
 }
 
 // ── Historial ────────────────────────────────────────────────────────────

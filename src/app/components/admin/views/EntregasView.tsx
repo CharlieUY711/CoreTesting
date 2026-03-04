@@ -1,7 +1,7 @@
 import React from 'react';
 import { OrangeHeader } from '../OrangeHeader';
 import { CheckCircle2, XCircle, Clock, Search, Loader2 } from 'lucide-react';
-import { getEntregas } from '../../../services/entregasApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
 import { toast } from 'sonner';
 
 const ORANGE = '#FF6835';
@@ -13,6 +13,7 @@ const ESTADO_CFG: any = {
 };
 
 export function EntregasView({ onNavigate }: any) {
+  const supabase = useSupabaseClient();
   const [items, setItems] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [filtroEstado, setFiltroEstado] = React.useState('');
@@ -20,8 +21,14 @@ export function EntregasView({ onNavigate }: any) {
   const [selected, setSelected] = React.useState<string | null>(null);
 
   const load = async () => {
+    if (!supabase) return;
     setLoading(true);
-    try { setItems(await getEntregas({ estado: filtroEstado || undefined })); }
+    try {
+      let query = supabase.from('entregas').select('*, envios(numero, destinatario, destino)').order('fecha_entrega', { ascending: false });
+      if (filtroEstado) query = query.eq('estado', filtroEstado);
+      const { data } = await query;
+      setItems(data ?? []);
+    }
     catch { toast.error('Error'); }
     finally { setLoading(false); }
   };

@@ -3,9 +3,10 @@
  * Carga la configuración del cliente desde Supabase (infraestructura Charlie).
  *
  * Detecta el cliente por:
- *   1. Query param ?slug=oddy-market  (desarrollo / testing)
- *   2. window.location.hostname        (producción — cada cliente tiene su dominio)
+ *   1. Query param ?slug=testing  (desarrollo / testing)
+ *   2. window.location.hostname   (producción — cada cliente tiene su dominio)
  *
+ * Lee de la tabla tenant_config que unifica toda la configuración del tenant.
  * Nunca toca los datos del cliente — solo lee la config del shell.
  */
 
@@ -13,22 +14,37 @@
 const CHARLIE_URL = 'https://qhnmxvexkizcsmivfuam.supabase.co';
 const CHARLIE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFobm14dmV4a2l6Y3NtaXZmdWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMjEyODEsImV4cCI6MjA4Njc5NzI4MX0.Ifz4fJYldIGZFzhBK5PPxQeqdYzO2ZKNQ5uo8j2mYmM';
 
+// ── Tipos ──────────────────────────────────────────────────────────────────────
+
+export interface Conjunto {
+  tabla:   string;
+  filtro:  Record<string, any>;
+  mapeo:   Record<string, string>;
+}
+
 export interface RemoteConfig {
-  clienteId:    string;
-  clienteSlug:  string;
+  tenantId:      string;
+  tenantNombre:  string;
   clienteNombre: string;
-  shell:        string;
+  shell:         string;
   theme: {
     primary:    string;
     secondary?: string;
     nombre?:    string;
+    logo?:      string;
   };
-  modulos:      string[];
+  modulos:   string[];
   backend: {
+    tipo:        string;
+    url:         string;
+    anon_key:    string;
     supabaseUrl: string;
     supabaseKey: string;
   };
+  conjuntos: Record<string, Conjunto>;
 }
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 async function charlieFetch(path: string) {
   const res = await fetch(`${CHARLIE_URL}/rest/v1/${path}`, {
@@ -42,74 +58,60 @@ async function charlieFetch(path: string) {
   return res.json();
 }
 
-/**
- * Detecta el slug del cliente activo.
- * En desarrollo: usar ?slug=oddy-market en la URL.
- * En producción: el dominio coincide con cliente.dominio en Supabase.
- */
-function detectClientSlug(): string | null {
-  // 1. Query param (desarrollo)
+function detectTenantIdentifier(): string | null {
   const params = new URLSearchParams(window.location.search);
   const slugParam = params.get('slug');
   if (slugParam) return slugParam;
 
-  // 2. Hostname (producción)
   const hostname = window.location.hostname;
   if (hostname === 'localhost' || hostname === '127.0.0.1') return null;
-  return hostname; // el hostname ES el slug/dominio del cliente
+  return hostname;
 }
 
-/**
- * Carga la configuración remota del cliente.
- * Retorna null si no se puede determinar el cliente (fallback a config estática).
- */
+// ── Carga principal ────────────────────────────────────────────────────────────
+
 export async function loadRemoteConfig(): Promise<RemoteConfig | null> {
   try {
-    const slug = detectClientSlug();
+    const identifier = detectTenantIdentifier();
 
-    let clientes: any[] = [];
-    if (slug) {
-      // Buscar primero por dominio
-      clientes = await charlieFetch(
-        `clientes?dominio=eq.${encodeURIComponent(slug)}&activo=eq.true&limit=1`
-      );
-      // Si no encuentra por dominio, buscar por slug
-      if (!clientes || clientes.length === 0) {
-        clientes = await charlieFetch(
-          `clientes?slug=eq.${encodeURIComponent(slug)}&activo=eq.true&limit=1`
-        );
-      }
-    } else {
+    if (!identifier) {
+      console.warn('[ConfigLoader] No se detectó tenant — usando config estática.');
       return null;
     }
 
-    if (!clientes || clientes.length === 0) {
-      console.warn(`[ConfigLoader] Cliente "${slug}" no encontrado en Charlie.`);
-      return null;
-    }
-
-    const cliente = clientes[0];
-
-    // Cargar la config del cliente
-    const configs = await charlieFetch(
-      `cliente_config?cliente_id=eq.${cliente.id}&limit=1`
+    // Buscar primero por dominio, luego por tenant_id
+    let rows: any[] = await charlieFetch(
+      `tenant_config?dominio=eq.${encodeURIComponent(identifier)}&activo=eq.true&limit=1`
     );
 
-    if (!configs || configs.length === 0) {
-      console.warn(`[ConfigLoader] Sin config para cliente "${cliente.slug}".`);
+    if (!rows || rows.length === 0) {
+      rows = await charlieFetch(
+        `tenant_config?tenant_id=eq.${encodeURIComponent(identifier)}&activo=eq.true&limit=1`
+      );
+    }
+
+    if (!rows || rows.length === 0) {
+      console.warn(`[ConfigLoader] Tenant "${identifier}" no encontrado en tenant_config.`);
       return null;
     }
 
-    const cfg = configs[0];
+    const cfg = rows[0];
 
     return {
-      clienteId:     cliente.id,
-      clienteSlug:   cliente.slug,
-      clienteNombre: cliente.nombre,
-      shell:         cfg.shell || 'DashboardShell',
-      theme:         cfg.theme || { primary: '#6366F1' },
-      modulos:       cfg.modulos || [],
-      backend:       cfg.backend || { supabaseUrl: '', supabaseKey: '' },
+      tenantId:      cfg.tenant_id,
+      tenantNombre:  cfg.nombre,
+      clienteNombre: cfg.nombre,
+      shell:         cfg.shell     || 'DashboardShell',
+      theme:         cfg.theme     || { primary: '#6366F1' },
+      modulos:       cfg.modulos   || [],
+      backend: {
+        tipo:        cfg.backend?.tipo     || 'supabase',
+        url:         cfg.backend?.url      || '',
+        anon_key:    cfg.backend?.anon_key || '',
+        supabaseUrl: cfg.backend?.url      || '',
+        supabaseKey: cfg.backend?.anon_key || '',
+      },
+      conjuntos: cfg.conjuntos || {},
     };
 
   } catch (error) {

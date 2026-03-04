@@ -5,6 +5,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, ChevronRight, Check, Loader2 } from 'lucide-react';
 import type { DrawerFormProps, FieldDef, SheetDef } from './DrawerForm.types';
+import { GoogleAddressAutocomplete } from '../../ui/GoogleAddressAutocomplete';
+import { GOOGLE_MAPS_API_KEY } from '../../../../utils/google/config';
 
 // Obtener color primario del tenant desde CSS variable
 function getPrimaryColor(): string {
@@ -29,12 +31,16 @@ function FieldRenderer({
   field,
   value,
   onChange,
+  onMultiChange,
+  formData,
   error,
   primaryColor,
 }: {
   field: FieldDef;
   value: unknown;
   onChange: (value: unknown) => void;
+  onMultiChange?: (updates: Record<string, unknown>) => void;
+  formData?: Record<string, unknown>;
   error?: string;
   primaryColor: string;
 }) {
@@ -342,6 +348,72 @@ function FieldRenderer({
         </div>
       );
 
+    case 'address': {
+      const addressValue = String(value || '');
+      const hasApiKey = GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'YOUR_API_KEY';
+      return (
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>
+            {field.label}
+            {field.required && <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>}
+          </label>
+          {hasApiKey ? (
+            <GoogleAddressAutocomplete
+              value={addressValue}
+              placeholder={field.placeholder || 'Ingresá una dirección...'}
+              required={field.required}
+              onChange={(val) => handleChange(val)}
+              onSelect={(result) => {
+                handleChange(result.address);
+                onMultiChange?.({
+                  [`${field.id}_data`]: result,
+                });
+              }}
+            />
+          ) : (
+            <input
+              type="text"
+              value={addressValue}
+              onChange={(e) => handleChange(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder={field.placeholder || 'Ingresá una dirección...'}
+              required={field.required}
+              style={inputStyle}
+            />
+          )}
+          {/* Sub-campos de ubicación */}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            {[
+              { key: `${field.id}_barrio`, label: 'Barrio' },
+              { key: `${field.id}_localidad`, label: 'Localidad' },
+              { key: `${field.id}_ciudad`, label: 'Ciudad' },
+              { key: `${field.id}_departamento`, label: 'Departamento' },
+            ].map(({ key, label }) => (
+              <div key={key} style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#64748b', marginBottom: '3px' }}>
+                  {label}
+                </label>
+                <input
+                  type="text"
+                  value={String(formData?.[key] || '')}
+                  onChange={(e) => onMultiChange?.({ [key]: e.target.value })}
+                  placeholder={label}
+                  style={{ ...baseInputStyle, fontSize: '12px', padding: '7px 10px' }}
+                />
+              </div>
+            ))}
+          </div>
+          {field.hint && (
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>{field.hint}</p>
+          )}
+          {error && (
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#ef4444' }}>{error}</p>
+          )}
+        </div>
+      );
+    }
+
     default:
       // text, email, tel, url, number, date, time
       return (
@@ -402,7 +474,8 @@ export function DrawerForm({
       setErrors({});
       setSaveError(null);
     }
-  }, [open, initialData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Manejar tecla Escape
   useEffect(() => {
@@ -777,6 +850,8 @@ export function DrawerForm({
                     field={field}
                     value={formData[field.id]}
                     onChange={(value) => updateField(field.id, value)}
+                    onMultiChange={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+                    formData={formData}
                     error={errors[field.id]}
                     primaryColor={primaryColor}
                   />
@@ -792,6 +867,8 @@ export function DrawerForm({
               field={field}
               value={formData[field.id]}
               onChange={(value) => updateField(field.id, value)}
+              onMultiChange={(updates) => setFormData((prev) => ({ ...prev, ...updates }))}
+              formData={formData}
               error={errors[field.id]}
               primaryColor={primaryColor}
             />

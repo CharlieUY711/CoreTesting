@@ -5,7 +5,19 @@ import React, { useState, useEffect } from 'react';
 import { OrangeHeader } from '../OrangeHeader';
 import type { MainSection } from '../../../AdminDashboard';
 import { Truck, Plus, Search, Edit2, Trash2, CheckCircle2, XCircle, Loader2, Car, Package } from 'lucide-react';
-import { getVehiculos, createVehiculo, updateVehiculo, deleteVehiculo, type Vehiculo } from '../../../services/vehiculosApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
+
+interface Vehiculo {
+  id: string;
+  patente: string;
+  tipo: string;
+  marca?: string;
+  modelo?: string;
+  anio?: number;
+  capacidad_kg?: number;
+  capacidad_m3?: number;
+  activo: boolean;
+}
 import { toast } from 'sonner';
 
 interface Props { onNavigate: (s: MainSection) => void; }
@@ -22,6 +34,7 @@ const TIPO_CFG: Record<string, { label: string; emoji: string }> = {
 const EMPTY: Partial<Vehiculo> = { tipo: 'moto', activo: true };
 
 export function VehiculosView({ onNavigate }: Props) {
+  const supabase = useSupabaseClient();
   const [items, setItems] = useState<Vehiculo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -31,8 +44,12 @@ export function VehiculosView({ onNavigate }: Props) {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
+    if (!supabase) return;
     setLoading(true);
-    try { setItems(await getVehiculos()); }
+    try {
+      const { data } = await supabase.from('vehiculos').select('*').order('created_at', { ascending: false });
+      setItems(data ?? []);
+    }
     catch { toast.error('Error cargando vehículos'); }
     finally { setLoading(false); }
   };
@@ -48,14 +65,15 @@ export function VehiculosView({ onNavigate }: Props) {
   const openEdit = (v: Vehiculo) => { setForm(v); setEditing(v.id); setShowForm(true); };
 
   const save = async () => {
+    if (!supabase) return;
     if (!form.patente || !form.tipo) return toast.error('Patente y tipo son requeridos');
     setSaving(true);
     try {
       if (editing) {
-        await updateVehiculo(editing, form);
+        await supabase.from('vehiculos').update(form).eq('id', editing);
         toast.success('Vehículo actualizado');
       } else {
-        await createVehiculo(form);
+        await supabase.from('vehiculos').insert(form);
         toast.success('Vehículo creado');
       }
       setShowForm(false);
@@ -65,8 +83,9 @@ export function VehiculosView({ onNavigate }: Props) {
   };
 
   const remove = async (id: string) => {
+    if (!supabase) return;
     if (!confirm('¿Eliminar vehículo?')) return;
-    await deleteVehiculo(id);
+    await supabase.from('vehiculos').delete().eq('id', id);
     toast.success('Eliminado');
     load();
   };

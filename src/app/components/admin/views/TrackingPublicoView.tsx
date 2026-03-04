@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    TrackingPublicoView — Tracking Público de Envíos
    Búsqueda por número · Timeline de estados
    ===================================================== */
@@ -213,8 +213,8 @@ export function TrackingPublicoView({ onNavigate }: Props) {
         peso: data.peso || '',
         fechaEstimada: data.fecha_estimada || '',
         eventos: (data.eventos || []).map((e: TrackingEventoApi) => ({
-          fecha: e.fecha ? new Date(e.fecha).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '',
-          hora: e.hora || (e.fecha ? new Date(e.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : ''),
+          fecha: e.fecha ? new Date(e.fecha).toLocaleDateString('es-UY', { day: 'numeric', month: 'short' }) : '',
+          hora: e.hora || (e.fecha ? new Date(e.fecha).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' }) : ''),
           tipo: e.tipo || 'info',
           descripcion: e.descripcion,
           ubicacion: e.ubicacion || e.lugar || '',

@@ -194,8 +194,7 @@ const buildDefaultPermisos = (rol: RolKey): GrupoModulos[] => {
     {
       id: 'integraciones-logistica-group', label: 'Logística Integrada', icon: Truck, color: '#14B8A6', expanded: false,
       modulos: [
-        mkLogistica('oca',      'OCA',       isAdm || isSup),
-        mkLogistica('andreani', 'Andreani',  isAdm || isSup),
+        mkLogistica('correouy', 'Correo UY', isAdm || isSup),
         mkLogistica('correo',   'Correo UY', isAdm || isSup),
         mkLogistica('pedidosya','PedidosYa', isAdm || isSup),
       ],

@@ -12,7 +12,7 @@ import {
   ArrowRight, Users, TrendingUp, Archive,
   Loader2,
 } from 'lucide-react';
-import { getOrdenesFulfillment, getWaves, type OrdenFulfillment as OrdenFulfillmentApi, type Wave as WaveApi } from '../../../services/fulfillmentApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
 
 interface Props { onNavigate: (s: MainSection) => void; }
 const ORANGE = '#FF6835';
@@ -55,6 +55,7 @@ interface Wave {
 }
 
 export function FulfillmentView({ onNavigate }: Props) {
+  const supabase = useSupabaseClient();
   const [tab, setTab] = useState<Tab>('ordenes');
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState<EstadoOrden | 'todos'>('todos');
@@ -69,13 +70,19 @@ export function FulfillmentView({ onNavigate }: Props) {
   }, []);
 
   const loadData = async () => {
+    if (!supabase) return;
     setLoading(true);
     setError(null);
     try {
-      const [ordenesData, wavesData] = await Promise.all([
-        getOrdenesFulfillment(),
-        getWaves()
+      const [{ data: rawOrdenes, error: errOrdenes }, { data: rawWaves, error: errWaves }] = await Promise.all([
+        supabase.from('fulfillment_ordenes').select('*').order('created_at', { ascending: false }),
+        supabase.from('fulfillment_waves').select('*').order('created_at', { ascending: false }),
       ]);
+      if (errOrdenes) throw errOrdenes;
+      if (errWaves) throw errWaves;
+
+      const ordenesData = (rawOrdenes ?? []) as any[];
+      const wavesData = (rawWaves ?? []) as any[];
 
       const adaptedOrdenes: OrdenFulfillment[] = ordenesData.map(o => ({
         id: o.id,
@@ -97,7 +104,7 @@ export function FulfillmentView({ onNavigate }: Props) {
         id: w.id,
         nombre: w.nombre,
         ordenes: Array.isArray(w.ordenes) ? w.ordenes.length : 0,
-        items: 0, // Calcular si es necesario
+        items: 0,
         estado: w.estado,
         operarios: w.operarios || 0,
         inicio: w.inicio,

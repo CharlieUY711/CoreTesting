@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    MetaBusinessView — Meta Business / RRSS Shop
    Facebook · Instagram · Ads · Píxel · Catálogo
    ===================================================== */
@@ -62,7 +62,7 @@ const STATUS_COLOR = { active: '#22C55E', paused: '#F59E0B', ended: '#9CA3AF', s
 const STATUS_LABEL = { active: 'Activa', paused: 'Pausada', ended: 'Finalizada', synced: 'Sincronizado', pending: 'Pendiente', error: 'Error', inactive: 'Inactivo' } as const;
 
 const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-const pesos = (n: number) => `$${n.toLocaleString('es-AR')}`;
+const pesos = (n: number) => `$${n.toLocaleString('es-UY')}`;
 
 export function MetaBusinessView({ onNavigate }: Props) {
   const [tab, setTab] = useState<Tab>('overview');

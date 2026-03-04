@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    ProduccionView — Producción / Armado
    BOM · Órdenes de Armado · Kits y Canastas
    ===================================================== */
@@ -11,7 +11,7 @@ import {
   BarChart3, GitBranch, Box, Wrench, Play,
   Loader2,
 } from 'lucide-react';
-import { getArticulosProduccion, getOrdenesArmado, type ArticuloCompuesto as ArticuloCompuestoApi, type OrdenArmado as OrdenArmadoApi } from '../../../services/produccionApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
 
 interface Props { onNavigate: (s: MainSection) => void; }
 const ORANGE = '#FF6835';
@@ -72,6 +72,7 @@ const TIPO_CFG: Record<string, { label: string; emoji: string; color: string }> 
 };
 
 export function ProduccionView({ onNavigate }: Props) {
+  const supabase = useSupabaseClient();
   const [tab, setTab] = useState<Tab>('ordenes');
   const [search, setSearch] = useState('');
   const [selectedArticulo, setSelectedArticulo] = useState<ArticuloCompuesto | null>(null);
@@ -86,13 +87,19 @@ export function ProduccionView({ onNavigate }: Props) {
   }, []);
 
   const loadData = async () => {
+    if (!supabase) return;
     setLoading(true);
     setError(null);
     try {
-      const [articulosData, ordenesData] = await Promise.all([
-        getArticulosProduccion(true),
-        getOrdenesArmado()
+      const [{ data: rawArticulos, error: errArt }, { data: rawOrdenes, error: errOrd }] = await Promise.all([
+        supabase.from('produccion_articulos').select('*').eq('activo', true).order('nombre'),
+        supabase.from('produccion_ordenes_armado').select('*').order('created_at', { ascending: false }),
       ]);
+      if (errArt) throw errArt;
+      if (errOrd) throw errOrd;
+
+      const articulosData = (rawArticulos ?? []) as any[];
+      const ordenesData = (rawOrdenes ?? []) as any[];
 
       const adaptedArticulos: ArticuloCompuesto[] = articulosData.map(a => ({
         id: a.id,
@@ -307,7 +314,7 @@ export function ProduccionView({ onNavigate }: Props) {
                         <div style={{ fontSize: '12px', color: '#6B7280' }}>{selectedArticulo.descripcion}</div>
                         <div style={{ display: 'flex', gap: '12px', fontSize: '11px', color: '#374151', marginTop: '4px' }}>
                           <span>⏱ {selectedArticulo.tiempoArmado} min/u</span>
-                          <span>💰 ${selectedArticulo.costoManoObra.toLocaleString('es-AR')} mano de obra</span>
+                          <span>💰 ${selectedArticulo.costoManoObra.toLocaleString('es-UY')} mano de obra</span>
                         </div>
                       </div>
                     </div>

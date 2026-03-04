@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    TransportistasView — Catálogo de Carriers
    Transportistas · Tramos · Tarifas
    ===================================================== */
@@ -100,7 +100,7 @@ const TRANSPORTISTA_SHEETS: SheetDef[] = [
       { id: 'cp',           label: 'Código postal',         type: 'text',   placeholder: '11300',       row: 'row1' },
       { id: 'departamento', label: 'Departamento / Estado', type: 'text',   placeholder: 'Montevideo', row: 'row2' },
       { id: 'pais',         label: 'País',                  type: 'select',
-        options: [{ value: 'uy', label: 'Uruguay' }, { value: 'ar', label: 'Argentina' }, { value: 'br', label: 'Brasil' }],
+        options: [{ value: 'uy', label: 'Uruguay' }, { value: 'br', label: 'Brasil' }],
         row: 'row2'
       },
       { id: 'tramos', label: 'Tramos habilitados', type: 'multicheck',
@@ -181,23 +181,9 @@ export function TransportistasView({ onNavigate }: Props) {
   const [saving, setSaving]     = useState(false);
 
   // ── Datos vía useTable ────────────────────────────────────────────────────
-  const {
-    data: transportistas,
-    loading: loadingT,
-    error: errorT,
-    insert: insertTransportista,
-    refresh: refreshTransportistas,
-  } = useTable<Transportista>('transportistas', {
-    orderBy: { column: 'nombre', ascending: true },
-  });
+  const { data: transportistas, loading: loadingT, error: errorT, insert: insertTransportista, refresh: refreshTransportistas } = useTable<Transportista>('transportistas');
 
-  const {
-    data: tramos,
-    loading: loadingTr,
-    error: errorTr,
-  } = useTable<Tramo>('tramos', {
-    orderBy: { column: 'origen', ascending: true },
-  });
+  const { data: tramos, loading: loadingTr, error: errorTr } = useTable<Tramo>('tramos');
 
   const loading = loadingT || loadingTr;
   const error   = errorT || errorTr;
@@ -206,16 +192,16 @@ export function TransportistasView({ onNavigate }: Props) {
   const handleSave = async (formData: Record<string, unknown>) => {
     setSaving(true);
     const { error: insertError } = await insertTransportista({
-      nombre:          formData.nombre as string,
-      tipo:            formData.tipo as string,
-      estado:          formData.estado as string ?? 'activo',
-      activo:          formData.activo as boolean ?? true,
-      logo:            formData.logo as string,
-      contacto:        formData.contacto as string,
-      email:           formData.email as string,
-      telefono:        formData.telefono as string,
-      rating:          formData.rating ? Number(formData.rating) : 0,
-      tiempo_promedio: formData.tiempo_promedio as string,
+      nombre:           formData.nombre as string,
+      tipo:             formData.tipo as string,
+      activo:           formData.estado === 'inactivo' ? false : true,
+      email:            formData.email as string,
+      telefono:         formData.telefono as string,
+      sitio_web:        formData.web as string,
+      logo_url:         formData.logo as string,
+      documento:        formData.rut as string,
+      notas:            formData.notas as string,
+      metadata:         { contacto: formData.contacto, cargo: formData.cargo, whatsapp: formData.whatsapp },
     });
     setSaving(false);
 
@@ -440,7 +426,7 @@ export function TransportistasView({ onNavigate }: Props) {
                         <td style={{ padding: '12px 14px', fontSize: '12px', color: '#374151', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Clock size={11} color="#9CA3AF" /> {tramo.tiempoEstimado || '—'}
                         </td>
-                        <td style={{ padding: '12px 14px', fontSize: '13px', fontWeight: 700, color: '#111' }}>${(tramo.tarifaBase || 0).toLocaleString('es-AR')}</td>
+                        <td style={{ padding: '12px 14px', fontSize: '13px', fontWeight: 700, color: '#111' }}>${(tramo.tarifaBase || 0).toLocaleString('es-UY')}</td>
                         <td style={{ padding: '12px 14px', fontSize: '12px', color: '#6B7280' }}>${tramo.tarifaKg || 0}/kg</td>
                         <td style={{ padding: '12px 14px' }}>
                           <span style={{ fontSize: '10px', fontWeight: 700, color: tramo.activo ? '#059669' : '#9CA3AF', backgroundColor: tramo.activo ? '#ECFDF5' : '#F3F4F6', padding: '3px 8px', borderRadius: '10px' }}>
@@ -481,16 +467,15 @@ export function TransportistasView({ onNavigate }: Props) {
                   <p style={{ margin: '0 0 10px', fontSize: '12px', fontWeight: 700, color: '#374151' }}>Tarifas estimadas:</p>
                   {[
                     { carrier: 'Express Delivery GBA', tiempo: 'Same day', precio: 1400 },
-                    { carrier: 'OCA',                  tiempo: '24-48h',   precio: 1680 },
-                    { carrier: 'Correo Argentino',     tiempo: '3-4 días', precio: 2450 },
-                    { carrier: 'Andreani',             tiempo: '2-3 días', precio: 2750 },
+                    { carrier: 'Correo UY',   tiempo: '3-5 días', precio: 350 },
+                    { carrier: 'Brixo',       tiempo: '1-2 días', precio: 290 },
                   ].map(r => (
                     <div key={r.carrier} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #E5E7EB' }}>
                       <div>
                         <div style={{ fontSize: '12px', fontWeight: 600, color: '#111' }}>{r.carrier}</div>
                         <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{r.tiempo}</div>
                       </div>
-                      <div style={{ fontSize: '14px', fontWeight: 800, color: ORANGE }}>${r.precio.toLocaleString('es-AR')}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: ORANGE }}>${r.precio.toLocaleString('es-UY')}</div>
                     </div>
                   ))}
                 </div>

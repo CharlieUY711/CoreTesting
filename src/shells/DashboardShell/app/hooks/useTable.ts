@@ -24,6 +24,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabaseClient } from './useSupabaseClient';
+import { useOrchestrator } from '../providers/OrchestratorProvider';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -62,6 +63,13 @@ export function useTable<T = Record<string, unknown>>(
   } = options;
 
   const supabase = useSupabaseClient();
+  const { config } = useOrchestrator();
+
+  // Resolver conjunto: si existe en config.conjuntos, usar tabla y filtros del conjunto
+  const conjunto = config?.conjuntos?.[tabla];
+  const tablaReal   = conjunto?.tabla   ?? tabla;
+  const filtrosBase = conjunto?.filtro  ?? {};
+  const filtrosMerge = { ...filtrosBase, ...filters };
 
   const [data,    setData]    = useState<T[]>([]);
   const [loading, setLoading] = useState(autoFetch);
@@ -77,8 +85,8 @@ export function useTable<T = Record<string, unknown>>(
     setLoading(true);
     setError(null);
     try {
-      let query = supabase.from(tabla).select(select);
-      Object.entries(filters).forEach(([col, val]) => {
+      let query = supabase.from(tablaReal).select(select);
+      Object.entries(filtrosMerge).forEach(([col, val]) => {
         query = query.eq(col, val);
       });
       if (orderBy) {
@@ -105,7 +113,7 @@ export function useTable<T = Record<string, unknown>>(
   const insert = useCallback(async (row: Partial<T>) => {
     if (!supabase) return { data: null, error: 'Supabase client no disponible' };
     const { data: inserted, error: sbError } = await supabase
-      .from(tabla).insert(row).select().single();
+      .from(tablaReal).insert(row).select().single();
     if (sbError) {
       console.error(`[useTable] insert en "${tabla}":`, sbError.message);
       return { data: null, error: sbError.message };
@@ -118,7 +126,7 @@ export function useTable<T = Record<string, unknown>>(
   const update = useCallback(async (id: string | number, changes: Partial<T>) => {
     if (!supabase) return { error: 'Supabase client no disponible' };
     const { error: sbError } = await supabase
-      .from(tabla).update(changes).eq('id', id);
+      .from(tablaReal).update(changes).eq('id', id);
     if (sbError) {
       console.error(`[useTable] update en "${tabla}":`, sbError.message);
       return { error: sbError.message };
@@ -131,7 +139,7 @@ export function useTable<T = Record<string, unknown>>(
   const remove = useCallback(async (id: string | number) => {
     if (!supabase) return { error: 'Supabase client no disponible' };
     const { error: sbError } = await supabase
-      .from(tabla).delete().eq('id', id);
+      .from(tablaReal).delete().eq('id', id);
     if (sbError) {
       console.error(`[useTable] remove en "${tabla}":`, sbError.message);
       return { error: sbError.message };

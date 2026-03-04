@@ -117,7 +117,7 @@ const STATUS_META: Record<Status, { label: string; color: string; bg: string; Ic
   'coming-soon': { label: 'Próximamente',color: '#3B82F6', bg: '#DBEAFE', Icon: Zap          },
 };
 
-type RegionFilter = 'all' | 'uy' | 'ar' | 'global';
+type RegionFilter = 'all' | 'uy' | 'global';
 type ApiFilter = 'all' | 'api' | 'no-api';
 
 export function IntegracionesLogisticaView({ onNavigate }: Props) {
@@ -472,10 +472,10 @@ export function IntegracionesLogisticaView({ onNavigate }: Props) {
         {/* Filters */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#6B7280', alignSelf: 'center', marginRight: 4 }}>País:</span>
-          {(['all','uy','ar','global'] as RegionFilter[]).map(f => (
+          {(['all','uy','global'] as RegionFilter[]).map(f => (
             <button key={f} onClick={() => setRegionFilter(f)}
               style={{ padding: '5px 12px', borderRadius: 20, border: `1.5px solid ${regionFilter === f ? '#10B981' : '#E5E7EB'}`, cursor: 'pointer', backgroundColor: regionFilter === f ? '#10B981' : '#fff', color: regionFilter === f ? '#fff' : '#374151', fontSize: '0.78rem', fontWeight: '600' }}>
-              {{ all: 'Todos', uy: '🇺🇾 Uruguay', ar: '🇦🇷 Argentina', global: '🌎 Global' }[f]}
+              {{ all: 'Todos', uy: '🇺🇾 Uruguay', global: '🌎 Global' }[f]}
             </button>
           ))}
           <div style={{ width: 1, height: 28, backgroundColor: '#E5E7EB', alignSelf: 'center', margin: '0 4px' }} />

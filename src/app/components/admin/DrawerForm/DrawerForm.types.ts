@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 
 export type FieldType =
   | 'text' | 'email' | 'tel' | 'url' | 'number' | 'date' | 'time'
-  | 'textarea' | 'select' | 'multicheck' | 'toggle' | 'image';
+  | 'textarea' | 'select' | 'multicheck' | 'toggle' | 'image' | 'address';
 
 export interface FieldOption {
   value: string;

@@ -37,7 +37,6 @@ const STATUS_CFG = {
 
 const COUNTRY_DOCS: { flag: string; country: string; docs: string[] }[] = [
   { flag: '🇺🇾', country: 'Uruguay',   docs: ['Cédula de Identidad', 'Pasaporte', 'Licencia de Conducir'] },
-  { flag: '🇦🇷', country: 'Argentina', docs: ['DNI (Documento Nacional)', 'Pasaporte', 'Licencia de Conducir'] },
   { flag: '🇲🇽', country: 'México',    docs: ['INE (Credencial para Votar)', 'Pasaporte', 'Licencia de Conducir'] },
   { flag: '🇨🇱', country: 'Chile',     docs: ['Cédula de Identidad (RUT)', 'Pasaporte', 'Licencia de Conducir'] },
   { flag: '🇧🇷', country: 'Brasil',    docs: ['RG (Registro Geral)', 'CPF (con foto)', 'CNH', 'Pasaporte'] },

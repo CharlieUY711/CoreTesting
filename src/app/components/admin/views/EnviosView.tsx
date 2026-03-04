@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    EnviosView — Módulo de Envíos Operativo
    Árbol Pedido Madre → Envíos Hijos · Multi-tramo
    ===================================================== */
@@ -7,12 +7,13 @@ import { OrangeHeader } from '../OrangeHeader';
 import type { MainSection } from '../../../AdminDashboard';
 import {
   Truck, Package, MapPin, CheckCircle2, Clock, XCircle,
-  ChevronRight, ChevronDown, Search, Filter, Eye,
-  AlertCircle, RotateCcw, Navigation, Users, Calendar,
-  ArrowLeft, TrendingUp, Layers, Inbox, Loader2,
+  ChevronRight, ChevronDown, Search, Eye,
+  RotateCcw, Navigation, Layers, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import * as enviosApi from '../../../services/enviosApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
+import { DrawerForm } from '../DrawerForm';
+import type { SheetDef } from '../DrawerForm';
 
 interface Props { onNavigate: (s: MainSection) => void; }
 
@@ -38,6 +39,7 @@ interface Envio {
   origen: string;
   destino: string;
   destinatario: string;
+  remitente?: string;
   carrier: string;
   tramo: 'local' | 'intercity' | 'internacional' | 'last_mile';
   peso: number;
@@ -46,9 +48,6 @@ interface Envio {
   fechaEstimada: string;
   tracking?: string;
   eventos: EventoTracking[];
-  // Campos adicionales de Supabase
-  envioData?: enviosApi.Envio;
-  eventosData?: enviosApi.EventoTracking[];
 }
 
 interface PedidoMadre {
@@ -59,70 +58,104 @@ interface PedidoMadre {
   total: number;
 }
 
-/* ── Helpers para transformar datos ─────────────────────────────────────── */
+/* ── Sheets para DrawerForm ────────────────────────────────────────────── */
+const ENVIO_SHEETS: SheetDef[] = [
+  {
+    id: 'origen',
+    title: 'Origen',
+    subtitle: 'Remitente y origen · ¿Desde dónde sale el envío?',
+    fields: [
+      { id: 'remitente',   label: 'Remitente',        type: 'text',    required: true,  placeholder: 'Ej: Empresa SA' },
+      { id: 'origen',      label: 'Dirección de origen', type: 'address', required: true,  placeholder: 'Ej: Av. Italia 2500, Montevideo' },
+    ],
+  },
+  {
+    id: 'destino',
+    title: 'Destino',
+    subtitle: 'Destinatario y destino · ¿A dónde llega el envío?',
+    fields: [
+      { id: 'destinatario', label: 'Destinatario',       type: 'text',    required: true,  placeholder: 'Ej: Juan Pérez' },
+      { id: 'destino',      label: 'Dirección de destino', type: 'address', required: true,  placeholder: 'Ej: Bvar. Artigas 1500, Montevideo' },
+    ],
+  },
+  {
+    id: 'detalle',
+    title: 'Detalle',
+    subtitle: 'Detalles del envío · Carrier, peso y tramo',
+    fields: [
+      { id: 'carrier', label: 'Carrier',  type: 'text',   placeholder: 'Ej: OCA', row: 'row1' },
+      { id: 'tramo',   label: 'Tramo',    type: 'select', required: true,
+        options: [
+          { value: 'local',         label: 'Local' },
+          { value: 'intercity',     label: 'Intercity' },
+          { value: 'internacional', label: 'Internacional' },
+          { value: 'last_mile',     label: 'Last Mile' },
+        ],
+        row: 'row1',
+      },
+      { id: 'peso',   label: 'Peso (kg)', type: 'number', placeholder: '0.00', row: 'row2' },
+      { id: 'bultos', label: 'Bultos',    type: 'number', placeholder: '1',    row: 'row2' },
+      { id: 'fecha_estimada', label: 'Fecha estimada de entrega', type: 'date' },
+      { id: 'tracking',       label: 'Número de tracking',        type: 'text', placeholder: 'Opcional' },
+    ],
+  },
+];
 
-// Transforma un Envio de Supabase al formato de la UI
-function transformEnvio(envio: enviosApi.Envio, eventos: enviosApi.EventoTracking[] = []): Envio {
-  const fechaCreacion = new Date(envio.fecha_creacion);
-  const fechaEstimada = envio.fecha_estimada || '';
-  
-  // Transformar eventos de Supabase al formato de la UI
+/* ── Helpers para transformar datos ─────────────────────────────────────── */
+function transformEnvioRaw(row: Record<string, unknown>, eventos: Record<string, unknown>[] = []): Envio {
+  const fechaCreacion = row.fecha_creacion ? new Date(row.fecha_creacion as string) : new Date();
+
   const eventosUI: EventoTracking[] = eventos.map(ev => {
-    const fechaEv = new Date(ev.fecha);
+    const fechaEv = ev.fecha ? new Date(ev.fecha as string) : new Date();
     return {
-      fecha: fechaEv.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }),
-      hora: fechaEv.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
-      estado: ev.estado,
-      descripcion: ev.descripcion,
-      ubicacion: ev.ubicacion || 'Sistema',
+      fecha:       fechaEv.toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit' }),
+      hora:        fechaEv.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' }),
+      estado:      ev.estado as EstadoEnvio,
+      descripcion: (ev.descripcion as string) || '',
+      ubicacion:   (ev.ubicacion as string)  || 'Sistema',
     };
   });
-  
+
   return {
-    id: envio.id,
-    numero: envio.numero,
-    pedidoMadre: envio.numero_pedido || envio.pedido_madre_id || '',
-    estado: envio.estado,
-    origen: envio.origen,
-    destino: envio.destino,
-    destinatario: envio.destinatario,
-    carrier: envio.carrier,
-    tramo: envio.tramo,
-    peso: Number(envio.peso) || 0,
-    bultos: envio.bultos || 1,
+    id:           row.id as string,
+    numero:       (row.numero as string) || '',
+    pedidoMadre:  (row.numero_pedido as string) || (row.pedido_madre_id as string) || '',
+    estado:       (row.estado as EstadoEnvio) || 'creado',
+    origen:       (row.origen as string) || '',
+    destino:      (row.destino as string) || '',
+    destinatario: (row.destinatario as string) || '',
+    remitente:    (row.remitente as string) || '',
+    carrier:      (row.carrier as string) || '',
+    tramo:        (row.tramo as Envio['tramo']) || 'local',
+    peso:         Number(row.peso) || 0,
+    bultos:       Number(row.bultos) || 1,
     fechaCreacion: fechaCreacion.toISOString().split('T')[0],
-    fechaEstimada,
-    tracking: envio.tracking,
-    eventos: eventosUI,
-    envioData: envio,
-    eventosData: eventos,
+    fechaEstimada: (row.fecha_estimada as string) || '',
+    tracking:     (row.tracking as string) || undefined,
+    eventos:      eventosUI,
   };
 }
 
 // Agrupa envíos por pedido madre
 function agruparPorPedido(envios: Envio[]): PedidoMadre[] {
   const grupos = new Map<string, { numero: string; cliente: string; envios: Envio[]; total: number }>();
-  
+
   envios.forEach(envio => {
     const pedidoKey = envio.pedidoMadre || 'sin-pedido';
     if (!grupos.has(pedidoKey)) {
       grupos.set(pedidoKey, {
         numero: envio.pedidoMadre || 'Sin pedido',
-        cliente: envio.destinatario, // Por ahora usamos el destinatario como cliente
+        cliente: envio.destinatario,
         envios: [],
         total: 0,
       });
     }
     const grupo = grupos.get(pedidoKey)!;
     grupo.envios.push(envio);
-    // TODO: calcular total desde pedidos reales
     grupo.total += 0;
   });
-  
-  return Array.from(grupos.entries()).map(([id, data]) => ({
-    id,
-    ...data,
-  }));
+
+  return Array.from(grupos.entries()).map(([id, data]) => ({ id, ...data }));
 }
 
 /* ── Estado config ─────────────────────────────────── */
@@ -170,57 +203,59 @@ function EstadoBadge({ estado }: { estado: EstadoEnvio }) {
 }
 
 export function EnviosView({ onNavigate }: Props) {
-  const [pedidos, setPedidos] = useState<PedidoMadre[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expandedPedidos, setExpandedPedidos] = useState<Set<string>>(new Set());
-  const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
-  const [search, setSearch] = useState('');
-  const [filterEstado, setFilterEstado] = useState<EstadoEnvio | 'todos'>('todos');
-  const [filterTramo, setFilterTramo] = useState<string>('todos');
-  const [refreshing, setRefreshing] = useState(false);
+  const supabase = useSupabaseClient();
 
-  // Cargar envíos desde Supabase
+  const [pedidos,          setPedidos]          = useState<PedidoMadre[]>([]);
+  const [loading,          setLoading]          = useState(true);
+  const [expandedPedidos,  setExpandedPedidos]  = useState<Set<string>>(new Set());
+  const [selectedEnvio,    setSelectedEnvio]    = useState<Envio | null>(null);
+  const [search,           setSearch]           = useState('');
+  const [filterEstado,     setFilterEstado]     = useState<EstadoEnvio | 'todos'>('todos');
+  const [filterTramo,      setFilterTramo]      = useState<string>('todos');
+  const [refreshing,       setRefreshing]       = useState(false);
+  const [drawerOpen,       setDrawerOpen]       = useState(false);
+  const [saving,           setSaving]           = useState(false);
+
+  // ── Cargar envíos desde Supabase ──────────────────────────────────────────
   const loadEnvios = useCallback(async () => {
+    if (!supabase) return;
     try {
       setLoading(true);
-      console.log('[EnviosView] Iniciando carga de envíos...');
-      const filters: any = {};
-      if (filterEstado !== 'todos') filters.estado = filterEstado;
-      if (filterTramo !== 'todos') filters.tramo = filterTramo;
-      
-      console.log('[EnviosView] Filtros aplicados:', filters);
-      const { envios: enviosData, eventos: todosEventos } = await enviosApi.getEnvios(filters);
-      
-      console.log('[EnviosView] Datos recibidos:', { 
-        envios: enviosData.length, 
-        eventos: todosEventos.length 
-      });
-      
-      // Crear un mapa de eventos por envío para acceso rápido
-      const eventosPorEnvio = new Map<string, enviosApi.EventoTracking[]>();
-      todosEventos.forEach(ev => {
-        if (!eventosPorEnvio.has(ev.envio_id)) {
-          eventosPorEnvio.set(ev.envio_id, []);
-        }
-        eventosPorEnvio.get(ev.envio_id)!.push(ev);
-      });
-      
-      console.log('[EnviosView] Eventos agrupados por envío:', eventosPorEnvio.size);
-      
-      // Transformar envíos con sus eventos
-      const enviosConEventos = enviosData.map(envio => {
-        const eventos = eventosPorEnvio.get(envio.id) || [];
-        return transformEnvio(envio, eventos);
-      });
-      
-      console.log('[EnviosView] Envíos transformados:', enviosConEventos.length);
-      
-      // Agrupar por pedido
-      const pedidosAgrupados = agruparPorPedido(enviosConEventos);
-      console.log('[EnviosView] Pedidos agrupados:', pedidosAgrupados.length);
+
+      let query = supabase.from('envios').select('*').order('fecha_creacion', { ascending: false });
+      if (filterEstado !== 'todos') query = query.eq('estado', filterEstado);
+      if (filterTramo  !== 'todos') query = query.eq('tramo',  filterTramo);
+
+      const { data: enviosData, error: enviosError } = await query;
+      if (enviosError) throw enviosError;
+
+      const rows = (enviosData ?? []) as Record<string, unknown>[];
+
+      // Cargar eventos de tracking para estos envíos
+      const ids = rows.map(r => r.id as string).filter(Boolean);
+      let eventosMap = new Map<string, Record<string, unknown>[]>();
+
+      if (ids.length > 0) {
+        const { data: eventosData } = await supabase
+          .from('eventos_tracking')
+          .select('*')
+          .in('envio_id', ids)
+          .order('fecha', { ascending: false });
+
+        (eventosData ?? []).forEach((ev: Record<string, unknown>) => {
+          const envioId = ev.envio_id as string;
+          if (!eventosMap.has(envioId)) eventosMap.set(envioId, []);
+          eventosMap.get(envioId)!.push(ev);
+        });
+      }
+
+      const enviosTransformados = rows.map(row =>
+        transformEnvioRaw(row, eventosMap.get(row.id as string) ?? [])
+      );
+
+      const pedidosAgrupados = agruparPorPedido(enviosTransformados);
       setPedidos(pedidosAgrupados);
-      
-      // Expandir el primer pedido solo la primera vez
+
       setExpandedPedidos(prev => {
         if (prev.size === 0 && pedidosAgrupados.length > 0) {
           return new Set([pedidosAgrupados[0].id]);
@@ -229,58 +264,48 @@ export function EnviosView({ onNavigate }: Props) {
       });
     } catch (err) {
       console.error('[EnviosView] Error cargando envíos:', err);
-      // Extraer mensaje de error de forma segura
-      let errorMsg = 'Error desconocido';
-      if (err instanceof Error) {
-        errorMsg = err.message;
-      } else if (typeof err === 'object' && err !== null) {
-        // Intentar extraer mensaje de objetos de error
-        if ('message' in err && typeof err.message === 'string') {
-          errorMsg = err.message;
-        } else if ('error' in err && typeof err.error === 'string') {
-          errorMsg = err.error;
-        } else {
-          errorMsg = 'Error al cargar envíos. Por favor, intenta nuevamente.';
-        }
-      } else {
-        errorMsg = String(err);
-      }
-      toast.error(`Error al cargar envíos: ${errorMsg}`);
-      // Mostrar envíos vacíos en caso de error
+      toast.error('Error al cargar envíos');
       setPedidos([]);
     } finally {
       setLoading(false);
     }
-  }, [filterEstado, filterTramo]);
+  }, [supabase, filterEstado, filterTramo]);
 
   useEffect(() => {
     loadEnvios();
   }, [loadEnvios]);
 
-  // Cargar detalles del envío seleccionado
-  useEffect(() => {
-    if (!selectedEnvio?.id) return;
-    
-    const loadDetalle = async () => {
-      try {
-        const detalle = await enviosApi.getEnvio(selectedEnvio.id);
-        if (detalle) {
-          const envioActualizado = transformEnvio(detalle.envio, detalle.eventos);
-          setSelectedEnvio(envioActualizado);
-          
-          // Actualizar en la lista también
-          setPedidos(prev => prev.map(p => ({
-            ...p,
-            envios: p.envios.map(e => e.id === envioActualizado.id ? envioActualizado : e),
-          })));
-        }
-      } catch (err) {
-        console.error('[EnviosView] Error cargando detalle:', err);
-      }
-    };
-    
-    loadDetalle();
-  }, [selectedEnvio?.id]);
+  // ── Guardar nuevo envío ───────────────────────────────────────────────────
+  const handleSaveEnvio = async (formData: Record<string, unknown>) => {
+    if (!supabase) return;
+    setSaving(true);
+    try {
+      const { error: insertError } = await supabase.from('envios').insert({
+        remitente:       formData.remitente      as string,
+        origen:          formData.origen         as string,
+        destino:         formData.destino        as string,
+        destinatario:    formData.destinatario   as string,
+        carrier:         formData.carrier        as string  ?? '',
+        tramo:           formData.tramo          as string  ?? 'local',
+        peso:            formData.peso           ? Number(formData.peso) : 0,
+        bultos:          formData.bultos         ? Number(formData.bultos) : 1,
+        fecha_estimada:  formData.fecha_estimada as string  ?? null,
+        tracking:        formData.tracking       as string  ?? null,
+        estado:          'creado',
+      });
+
+      if (insertError) throw insertError;
+
+      toast.success('Envío creado exitosamente');
+      setDrawerOpen(false);
+      await loadEnvios();
+    } catch (err) {
+      console.error('[EnviosView] Error guardando envío:', err);
+      toast.error('Error al guardar el envío');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const togglePedido = (id: string) => {
     setExpandedPedidos(prev => {
@@ -290,16 +315,26 @@ export function EnviosView({ onNavigate }: Props) {
     });
   };
 
-  // Actualizar estado de envío
+  // ── Actualizar estado de envío ────────────────────────────────────────────
   const handleUpdateEstado = async (envioId: string, nuevoEstado: EstadoEnvio, descripcion?: string) => {
+    if (!supabase) return;
     try {
       setRefreshing(true);
-      await enviosApi.updateEnvio(envioId, {
-        estado: nuevoEstado,
-        descripcion_evento: descripcion || `Estado cambiado a ${nuevoEstado}`,
-        ubicacion: 'Sistema',
-        origen_evento: 'manual',
+
+      const { error: updateError } = await supabase
+        .from('envios')
+        .update({ estado: nuevoEstado })
+        .eq('id', envioId);
+      if (updateError) throw updateError;
+
+      await supabase.from('eventos_tracking').insert({
+        envio_id:    envioId,
+        estado:      nuevoEstado,
+        descripcion: descripcion || `Estado cambiado a ${nuevoEstado}`,
+        ubicacion:   'Sistema',
+        fecha:       new Date().toISOString(),
       });
+
       toast.success('Estado actualizado');
       await loadEnvios();
     } catch (err) {
@@ -309,7 +344,7 @@ export function EnviosView({ onNavigate }: Props) {
     }
   };
 
-  // Estadísticas globales
+  // ── Estadísticas ──────────────────────────────────────────────────────────
   const allEnvios = pedidos.flatMap(p => p.envios);
   const stats = {
     total:       allEnvios.length,
@@ -319,7 +354,7 @@ export function EnviosView({ onNavigate }: Props) {
     pendientes:  allEnvios.filter(e => e.estado === 'creado').length,
   };
 
-  // Filtro de pedidos
+  // ── Filtro de pedidos ─────────────────────────────────────────────────────
   const pedidosFiltrados = useMemo(() => {
     return pedidos.filter(p => {
       const matchSearch = !search ||
@@ -328,7 +363,7 @@ export function EnviosView({ onNavigate }: Props) {
         p.envios.some(e => e.numero.toLowerCase().includes(search.toLowerCase()) || e.destinatario.toLowerCase().includes(search.toLowerCase()));
       if (!matchSearch) return false;
       if (filterEstado !== 'todos' && !p.envios.some(e => e.estado === filterEstado)) return false;
-      if (filterTramo !== 'todos' && !p.envios.some(e => e.tramo === filterTramo)) return false;
+      if (filterTramo  !== 'todos' && !p.envios.some(e => e.tramo  === filterTramo))  return false;
       return true;
     });
   }, [pedidos, search, filterEstado, filterTramo]);
@@ -353,7 +388,7 @@ export function EnviosView({ onNavigate }: Props) {
         actions={[
           { label: '← Logística', onClick: () => onNavigate('logistica') },
           { label: refreshing ? 'Actualizando...' : '🔄 Actualizar', onClick: () => loadEnvios() },
-          { label: '+ Nuevo Envío', primary: true, onClick: () => {} },
+          { label: '+ Nuevo Envío', primary: true, onClick: () => setDrawerOpen(true) },
         ]}
       />
 
@@ -380,7 +415,7 @@ export function EnviosView({ onNavigate }: Props) {
                 style={{ width: '100%', paddingLeft: '34px', paddingRight: '12px', paddingTop: '8px', paddingBottom: '8px', border: '1px solid #E5E7EB', borderRadius: '8px', fontSize: '13px', outline: 'none', backgroundColor: '#fff', boxSizing: 'border-box' }}
               />
             </div>
-            <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as any)}
+            <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as EstadoEnvio | 'todos')}
               style={{ padding: '8px 12px', border: '1px solid #E5E7EB', borderRadius: '8px', fontSize: '13px', backgroundColor: '#fff', cursor: 'pointer' }}>
               <option value="todos">Todos los estados</option>
               {Object.entries(ESTADO_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -417,11 +452,11 @@ export function EnviosView({ onNavigate }: Props) {
                           <span style={{ fontSize: '14px', fontWeight: 800, color: '#111' }}>{pedido.numero}</span>
                           <span style={{ fontSize: '12px', color: '#6B7280' }}>·</span>
                           <span style={{ fontSize: '13px', color: '#374151', fontWeight: 500 }}>{pedido.cliente}</span>
-                          {hayFallido && <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', backgroundColor: '#FEE2E2', padding: '2px 7px', borderRadius: '10px' }}>⚠ Tiene fallidos</span>}
+                          {hayFallido     && <span style={{ fontSize: '10px', fontWeight: 700, color: '#DC2626', backgroundColor: '#FEE2E2', padding: '2px 7px', borderRadius: '10px' }}>⚠ Tiene fallidos</span>}
                           {todosEntregados && <span style={{ fontSize: '10px', fontWeight: 700, color: '#059669', backgroundColor: '#D1FAE5', padding: '2px 7px', borderRadius: '10px' }}>✓ Todo entregado</span>}
                         </div>
                         <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>
-                          {pedido.envios.length} envío{pedido.envios.length > 1 ? 's' : ''} · Total: ${pedido.total.toLocaleString('es-AR')}
+                          {pedido.envios.length} envío{pedido.envios.length > 1 ? 's' : ''} · Total: ${pedido.total.toLocaleString('es-UY')}
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0, flexWrap: 'wrap' }}>
@@ -435,9 +470,9 @@ export function EnviosView({ onNavigate }: Props) {
                     {isOpen && (
                       <div style={{ borderTop: '1px solid #E5E7EB' }}>
                         {pedido.envios.map((envio, idx) => {
-                          const cfg = ESTADO_CFG[envio.estado];
+                          const cfg      = ESTADO_CFG[envio.estado];
                           const tramoCfg = TRAMO_CFG[envio.tramo];
-                          const Icon = cfg.icon;
+                          const Icon     = cfg.icon;
                           const isSelected = selectedEnvio?.id === envio.id;
                           return (
                             <div
@@ -477,6 +512,15 @@ export function EnviosView({ onNavigate }: Props) {
                   </div>
                 );
               })}
+
+              {/* Estado vacío */}
+              {pedidosFiltrados.length === 0 && !loading && (
+                <div style={{ textAlign: 'center', padding: '48px 24px', color: '#9CA3AF' }}>
+                  <Package size={40} color="#E5E7EB" style={{ margin: '0 auto 12px' }} />
+                  <p style={{ fontSize: '14px', fontWeight: 600, color: '#374151', margin: '0 0 6px' }}>No hay envíos</p>
+                  <p style={{ fontSize: '12px', margin: 0 }}>Creá el primer envío con el botón "+ Nuevo Envío"</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -493,13 +537,14 @@ export function EnviosView({ onNavigate }: Props) {
               <EstadoBadge estado={selectedEnvio.estado} />
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {[
-                  ['Carrier', selectedEnvio.carrier],
-                  ['Tramo', TRAMO_CFG[selectedEnvio.tramo].label],
-                  ['Origen', selectedEnvio.origen],
-                  ['Destino', selectedEnvio.destino],
+                  ['Carrier',      selectedEnvio.carrier],
+                  ['Tramo',        TRAMO_CFG[selectedEnvio.tramo]?.label ?? selectedEnvio.tramo],
+                  ['Remitente',    selectedEnvio.remitente || '—'],
+                  ['Origen',       selectedEnvio.origen],
+                  ['Destino',      selectedEnvio.destino],
                   ['Destinatario', selectedEnvio.destinatario],
-                  ['Peso', `${selectedEnvio.peso} kg · ${selectedEnvio.bultos} bulto${selectedEnvio.bultos > 1 ? 's' : ''}`],
-                  ['F. estimada', selectedEnvio.fechaEstimada],
+                  ['Peso',         `${selectedEnvio.peso} kg · ${selectedEnvio.bultos} bulto${selectedEnvio.bultos > 1 ? 's' : ''}`],
+                  ['F. estimada',  selectedEnvio.fechaEstimada],
                   ...(selectedEnvio.tracking ? [['Tracking #', selectedEnvio.tracking]] : []),
                 ].map(([label, value]) => (
                   <div key={label} style={{ display: 'flex', gap: '8px', fontSize: '12px' }}>
@@ -515,12 +560,11 @@ export function EnviosView({ onNavigate }: Props) {
               <p style={{ fontSize: '12px', fontWeight: 700, color: '#374151', marginBottom: '14px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Historial de seguimiento</p>
               <div style={{ position: 'relative' }}>
                 {selectedEnvio.eventos.map((ev, idx) => {
-                  const cfg = ESTADO_CFG[ev.estado];
-                  const Icon = cfg.icon;
+                  const cfg    = ESTADO_CFG[ev.estado];
+                  const Icon   = cfg.icon;
                   const isFirst = idx === 0;
                   return (
                     <div key={idx} style={{ display: 'flex', gap: '12px', paddingBottom: '16px', position: 'relative' }}>
-                      {/* línea vertical */}
                       {idx < selectedEnvio.eventos.length - 1 && (
                         <div style={{ position: 'absolute', left: '14px', top: '28px', bottom: 0, width: '2px', backgroundColor: '#E5E7EB' }} />
                       )}
@@ -534,6 +578,9 @@ export function EnviosView({ onNavigate }: Props) {
                     </div>
                   );
                 })}
+                {selectedEnvio.eventos.length === 0 && (
+                  <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>Sin eventos registrados aún.</p>
+                )}
               </div>
             </div>
 
@@ -543,7 +590,7 @@ export function EnviosView({ onNavigate }: Props) {
                 Ver tracking externo
               </button>
               {selectedEnvio.estado === 'fallido' && (
-                <button 
+                <button
                   onClick={() => handleUpdateEstado(selectedEnvio.id, 'creado', 'Re-despachado después de fallo')}
                   style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '8px', backgroundColor: ORANGE, color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                 >
@@ -551,7 +598,7 @@ export function EnviosView({ onNavigate }: Props) {
                 </button>
               )}
               {selectedEnvio.estado === 'creado' && (
-                <button 
+                <button
                   onClick={() => handleUpdateEstado(selectedEnvio.id, 'despachado', 'Envío despachado')}
                   style={{ flex: 1, padding: '9px', border: 'none', borderRadius: '8px', backgroundColor: '#2563EB', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                 >
@@ -562,6 +609,17 @@ export function EnviosView({ onNavigate }: Props) {
           </div>
         )}
       </div>
+
+      {/* DrawerForm — Nuevo Envío */}
+      <DrawerForm
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onSave={handleSaveEnvio}
+        title="Nuevo Envío"
+        icon={Truck}
+        sheets={ENVIO_SHEETS}
+        loading={saving}
+      />
     </div>
   );
 }

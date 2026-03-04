@@ -43,7 +43,7 @@ const TIPO_CFG: Record<string, { color: string; label: string; icon: React.Eleme
   fallido:     { color: '#DC2626', label: 'Fallido',      icon: AlertCircle,  size: 14 },
 };
 
-// Función ArgentinaSVG removida - ahora usamos Google Maps
+// Función SVG mapa removida - ahora usamos Google Maps
 
 export function MapaEnviosView({ onNavigate }: Props) {
   const [filtroTipo, setFiltroTipo] = useState<string>('todos');

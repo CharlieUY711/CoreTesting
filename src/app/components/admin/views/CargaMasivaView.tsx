@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    CargaMasivaView — Upload masivo de archivos
    Drag & drop · Queue · Supabase Storage
    ===================================================== */
@@ -325,7 +325,7 @@ export function CargaMasivaView({ onNavigate }: Props) {
                       {f.name}
                     </p>
                     <p style={{ margin: '2px 0 0', fontSize: '0.7rem', color: '#9CA3AF' }}>
-                      {formatSize(f.size)} · {new Date(f.createdAt).toLocaleDateString('es-AR')}
+                      {formatSize(f.size)} · {new Date(f.createdAt).toLocaleDateString('es-UY')}
                     </p>
                   </div>
                   {f.signedUrl && (

@@ -1,7 +1,7 @@
 import React from 'react';
 import { OrangeHeader } from '../OrangeHeader';
 import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
-import { getDepositos, createDeposito, updateDeposito, deleteDeposito } from '../../../services/depositosApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
 import { toast } from 'sonner';
 
 const ORANGE = '#FF6835';
@@ -13,6 +13,7 @@ const TIPO_CFG: any = {
 const EMPTY = { tipo: 'propio', activo: true };
 
 export function DepositosView({ onNavigate }: any) {
+  const supabase = useSupabaseClient();
   const [items, setItems] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
@@ -22,8 +23,12 @@ export function DepositosView({ onNavigate }: any) {
   const [saving, setSaving] = React.useState(false);
 
   const load = async () => {
+    if (!supabase) return;
     setLoading(true);
-    try { setItems(await getDepositos()); }
+    try {
+      const { data } = await supabase.from('depositos').select('*').order('nombre');
+      setItems(data ?? []);
+    }
     catch { toast.error('Error'); }
     finally { setLoading(false); }
   };
@@ -33,11 +38,12 @@ export function DepositosView({ onNavigate }: any) {
   const filtered = items.filter(d => d.nombre.toLowerCase().includes(search.toLowerCase()));
 
   const save = async () => {
+    if (!supabase) return;
     if (!form.nombre || !form.direccion) return toast.error('Nombre y direccion requeridos');
     setSaving(true);
     try {
-      if (editing) { await updateDeposito(editing, form); toast.success('Actualizado'); }
-      else { await createDeposito(form); toast.success('Creado'); }
+      if (editing) { await supabase.from('depositos').update(form).eq('id', editing); toast.success('Actualizado'); }
+      else { await supabase.from('depositos').insert(form); toast.success('Creado'); }
       setShowForm(false); load();
     } catch { toast.error('Error'); }
     finally { setSaving(false); }
@@ -79,7 +85,7 @@ export function DepositosView({ onNavigate }: any) {
                       <span style={{ background: cfg.bg, color: cfg.color, fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20 }}>{cfg.label}</span>
                       <button onClick={() => { setForm(d); setEditing(d.id); setShowForm(true); }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280' }}><Edit2 size={15} /></button>
-                      <button onClick={async () => { if (confirm('Eliminar?')) { await deleteDeposito(d.id); load(); } }}
+                      <button onClick={async () => { if (supabase && confirm('Eliminar?')) { await supabase.from('depositos').delete().eq('id', d.id); load(); } }}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={15} /></button>
                     </div>
                   );

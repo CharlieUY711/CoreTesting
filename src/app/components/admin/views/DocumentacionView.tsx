@@ -227,8 +227,7 @@ Orquestador de pagos multi-adquirente para Uruguay.
 
 | Proveedor | País | Estado |
 |-----------|------|--------|
-| OCA | AR | Disponible |
-| Andreani | AR | Disponible |
+| Correo UY | UY | Disponible |
 | Correo UY | UY | Disponible |
 | PedidosYa | UY/AR | Disponible |
 
@@ -263,7 +262,7 @@ Orquestador de pagos multi-adquirente para Uruguay.
 Charlie es una plataforma all-in-one para gestionar tu negocio digital: ventas, logística, marketing, ERP y más desde un único panel.
 
 **¿Funciona para múltiples países?**
-Sí. Charlie es multi-país (Uruguay, Argentina) con soporte multi-moneda y multi-impuestos.
+Sí. Charlie es multi-país (Uruguay, Brasil, Latam) con soporte multi-moneda y multi-impuestos.
 
 **¿Puedo tener múltiples tiendas?**
 Sí, la arquitectura es multi-tenant. Cada tenant tiene su propia configuración, datos y usuarios.

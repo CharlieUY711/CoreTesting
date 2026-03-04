@@ -135,7 +135,7 @@ export const MODULES_DATA: ModuleBaseData[] = [
     id: 'logistics-map',
     name: 'Mapa de Envíos',
     category: 'logistics',
-    description: 'Mapa SVG de Argentina con puntos de envíos activos',
+    description: 'Mapa SVG de Uruguay con puntos de envíos activos',
     estimatedHours: 12,
   },
   {

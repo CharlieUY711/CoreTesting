@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    UnifiedWorkspaceView — Espacio de trabajo unificado
    Docs · Tareas · Notas · Calendario · Chat
    ===================================================== */
@@ -247,7 +247,7 @@ export function UnifiedWorkspaceView({ onNavigate }: Props) {
                       <div style={{ flex: 1 }}>
                         <p style={{ margin: 0, fontWeight: '700', fontSize: '0.85rem', color: '#111' }}>{doc.title}</p>
                         <p style={{ margin: '2px 0 0', fontSize: '0.72rem', color: '#9CA3AF' }}>
-                          Editado {doc.updatedAt.toLocaleDateString('es-AR')} · {doc.content.slice(0, 60)}...
+                          Editado {doc.updatedAt.toLocaleDateString('es-UY')} · {doc.content.slice(0, 60)}...
                         </p>
                       </div>
                       <button onClick={e => { e.stopPropagation(); deleteDoc(doc.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
@@ -364,7 +364,7 @@ export function UnifiedWorkspaceView({ onNavigate }: Props) {
                   }}>
                     <p style={{ margin: 0, flex: 1, fontSize: '0.82rem', color: '#374151', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{note.content}</p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                      <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>{note.createdAt.toLocaleDateString('es-AR')}</span>
+                      <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>{note.createdAt.toLocaleDateString('es-UY')}</span>
                       <button onClick={() => deleteNote(note.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>
                         <Trash2 size={13} color="#9CA3AF" />
                       </button>
@@ -481,7 +481,7 @@ export function UnifiedWorkspaceView({ onNavigate }: Props) {
                           {msg.text}
                         </div>
                         <p style={{ margin: '3px 0 0', fontSize: '0.65rem', color: '#9CA3AF', textAlign: isMe ? 'right' : 'left' }}>
-                          {msg.time.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                          {msg.time.toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     </div>

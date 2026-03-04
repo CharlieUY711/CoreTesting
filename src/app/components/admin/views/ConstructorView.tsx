@@ -1,7 +1,15 @@
-/* =====================================================
+﻿/* =====================================================
    ConstructorView — Generador de proyectos
    ===================================================== */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { supabase } from '../../../../utils/supabase/client';
+import { createClient } from '@supabase/supabase-js';
+
+// Cliente de Charlie — donde vive tenant_config
+const charlieSupabase = createClient(
+  'https://qhnmxvexkizcsmivfuam.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFobm14dmV4a2l6Y3NtaXZmdWFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMjEyODEsImV4cCI6MjA4Njc5NzI4MX0.Ifz4fJYldIGZFzhBK5PPxQeqdYzO2ZKNQ5uo8j2mYmM'
+);
 import { createPortal } from 'react-dom';
 import {
   Blocks, ShoppingCart, Truck, Megaphone, Rss, Wrench,
@@ -10,7 +18,7 @@ import {
   LayoutGrid, CreditCard, Download, Copy, CheckCheck,
   ExternalLink, Rocket, Palette, Globe, FileJson, Home,
   Save, FolderOpen, Clock, Trash2, ArrowRight, Minus,
-  Zap, Settings2, Users, BarChart3, Bell, Shield, MapPin,
+  Zap, Settings2, Users, BarChart3, Bell, Shield, MapPin, X,
 } from 'lucide-react';
 import type { MainSection } from '../../../AdminDashboard';
 
@@ -59,21 +67,17 @@ interface StorefrontPage {
 
 /* ── Sub-opciones ── */
 const SUBS_PAGOS: SubOption[] = [
-  { id: 'mercadopago',   label: 'MercadoPago',    badge: 'AR',     envVars: ['VITE_MP_ACCESS_TOKEN', 'VITE_MP_PUBLIC_KEY', 'VITE_MP_CLIENT_ID'] },
-  { id: 'flexo',         label: 'Flexo',           badge: 'AR',     envVars: ['VITE_FLEXO_API_KEY', 'VITE_FLEXO_SECRET'] },
-  { id: 'stripe',        label: 'Stripe',           badge: 'Global', envVars: ['VITE_STRIPE_PUBLIC_KEY', 'STRIPE_SECRET_KEY'] },
+  { id: 'mercadopago',   label: 'MercadoPago',    badge: 'UY',     envVars: ['VITE_MP_ACCESS_TOKEN', 'VITE_MP_PUBLIC_KEY', 'VITE_MP_CLIENT_ID'] },
+  { id: 'plexo',         label: 'Plexo',           badge: 'UY',     envVars: ['VITE_PLEXO_API_KEY', 'VITE_PLEXO_SECRET'] },
   { id: 'paypal',        label: 'PayPal',           badge: 'Global', envVars: ['VITE_PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET'] },
-  { id: 'rapipago',      label: 'Rapipago',         badge: 'AR',     envVars: ['VITE_RAPIPAGO_KEY'] },
-  { id: 'pagofacil',     label: 'Pago Fácil',      badge: 'AR',     envVars: ['VITE_PAGOFACIL_KEY'] },
-  { id: 'transferencia', label: 'Transferencia',    badge: 'AR',     envVars: ['VITE_CBU_DESTINO', 'VITE_ALIAS_DESTINO'] },
+  { id: 'transferencia', label: 'Transferencia',    badge: 'UY',     envVars: ['VITE_CBU_DESTINO', 'VITE_ALIAS_DESTINO'] },
 ];
 const SUBS_LOGISTICA: SubOption[] = [
-  { id: 'correo',   label: 'Correo Argentino', badge: 'AR',     envVars: ['VITE_CORREO_USER', 'VITE_CORREO_PASS', 'VITE_CORREO_CONTRATO'] },
-  { id: 'andreani', label: 'Andreani',          badge: 'AR',     envVars: ['VITE_ANDREANI_USER', 'VITE_ANDREANI_PASS', 'VITE_ANDREANI_CLIENT'] },
-  { id: 'oca',      label: 'OCA',               badge: 'AR',     envVars: ['VITE_OCA_USER', 'VITE_OCA_PASS', 'VITE_OCA_REMITO'] },
-  { id: 'edp',      label: 'Envíos del País',  badge: 'AR',     envVars: ['VITE_EDP_API_KEY'] },
+  { id: 'oddy',     label: 'ODDY',              badge: 'UY',     envVars: ['VITE_ODDY_API_KEY'] },
+  { id: 'dac',      label: 'DAC',               badge: 'UY',     envVars: ['VITE_DAC_API_KEY'] },
+  { id: 'agencia',  label: 'Agencia',           badge: 'UY',     envVars: ['VITE_AGENCIA_API_KEY'] },
   { id: 'dhl',      label: 'DHL',               badge: 'Global', envVars: ['VITE_DHL_ACCOUNT', 'VITE_DHL_API_KEY'] },
-  { id: 'pickup',   label: 'Retiro en tienda', badge: 'Local',  envVars: [] },
+  { id: 'pickup',   label: 'Retiro en tienda',  badge: 'Local',  envVars: [] },
 ];
 const SUBS_TIENDAS: SubOption[] = [
   { id: 'mercadolibre', label: 'MercadoLibre', badge: 'LATAM',  envVars: ['VITE_ML_APP_ID', 'VITE_ML_CLIENT_SECRET', 'VITE_ML_ACCESS_TOKEN'] },
@@ -441,6 +445,12 @@ export function ConstructorView({ onNavigate }: Props) {
   /* Save/Load */
   const [saved, setSaved]                 = useState(false);
   const [loadOpen, setLoadOpen]           = useState(false);
+  const [tenantSlug, setTenantSlug]           = useState('');
+  const [applyingTenant, setApplyingTenant]   = useState(false);
+  const [applyResult, setApplyResult]         = useState<'ok' | 'error' | null>(null);
+  const [loadingTenant, setLoadingTenant]     = useState(false);
+  const [loadResult, setLoadResult]           = useState<'ok' | 'error' | null>(null);
+
   const [savedMeta, setSavedMeta]         = useState<{ savedAt: string; projectName: string; step: string; storeName: string } | null>(null);
   const loadPanelRef                      = useRef<HTMLDivElement>(null);
 
@@ -540,12 +550,64 @@ export function ConstructorView({ onNavigate }: Props) {
     ...MODULES.filter(m => selected.has(m.id) || m.required).flatMap(m => { const base = m.subOptions ? [] : (m.envVars ?? []); const subs = m.subOptions ? m.subOptions.filter(s => (selectedSubs[m.id] ?? new Set()).has(s.id)).flatMap(s => s.envVars ?? []) : []; return [...base, ...subs]; }),
   ]));
 
-  const buildEnvContent = () => ['# .env.example — Charlie Marketplace Builder v1.5', `# Proyecto: ${projectName}`, `# Generado: ${new Date().toLocaleDateString('es-AR')}`, '', ...allEnvVars.map(v => v === 'VITE_STORE_NAME' ? `${v}="${storeName}"` : v === 'VITE_STORE_TAGLINE' ? `${v}="${storeTagline}"` : v === 'VITE_CURRENCY' ? `${v}="${storeCurrency}"` : v === 'VITE_PRIMARY_COLOR' ? `${v}="${primaryColor}"` : v === 'VITE_SECONDARY_COLOR' ? `${v}="${secondaryColor}"` : `${v}=""`)].join('\n');
+  const buildEnvContent = () => ['# .env.example — Charlie Marketplace Builder v1.5', `# Proyecto: ${projectName}`, `# Generado: ${new Date().toLocaleDateString('es-UY')}`, '', ...allEnvVars.map(v => v === 'VITE_STORE_NAME' ? `${v}="${storeName}"` : v === 'VITE_STORE_TAGLINE' ? `${v}="${storeTagline}"` : v === 'VITE_CURRENCY' ? `${v}="${storeCurrency}"` : v === 'VITE_PRIMARY_COLOR' ? `${v}="${primaryColor}"` : v === 'VITE_SECONDARY_COLOR' ? `${v}="${secondaryColor}"` : `${v}=""`)].join('\n');
   const buildConfigObj = () => ({ project: projectName, version: '1.0.0', generated: new Date().toISOString().split('T')[0], generator: 'Charlie Marketplace Builder v1.5', modules: MODULES.filter(m => selected.has(m.id) || m.required).map(m => m.id), providers: Object.fromEntries(Object.entries(selectedSubs).filter(([, s]) => s.size > 0).map(([k, v]) => [k, Array.from(v)])), frontstore: { branding: { storeName, tagline: storeTagline, currency: storeCurrency, primaryColor, secondaryColor, bgColor }, home: { sections: homeSections.map(s => ({ id: s.id, enabled: s.enabled })) }, pages: sfPages.map(p => ({ id: p.id, path: p.path, enabled: p.enabled })) } });
   const buildConfigJson = () => JSON.stringify(buildConfigObj(), null, 2);
 
   const download = (content: string, filename: string, type: string) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content], { type })); a.download = filename; a.click(); };
   const copyText = (text: string, fn: (v: boolean) => void) => { try { navigator.clipboard.writeText(text).then(() => { fn(true); setTimeout(() => fn(false), 2200); }); } catch {} };
+
+  const loadTenant = async () => {
+    if (!tenantSlug.trim()) return;
+    setLoadingTenant(true);
+    setLoadResult(null);
+    try {
+      const { data, error } = await charlieSupabase
+        .from('tenant_config')
+        .select('modulos')
+        .eq('tenant_id', tenantSlug.trim())
+        .single();
+      if (error || !data) throw new Error('Tenant no encontrado');
+      const modulosActivos: string[] = data.modulos ?? [];
+      // Marcar en el selector los módulos que tiene el tenant
+      const newSelected = new Set<string>(HUB_MODULE_IDS);
+      MODULES.forEach(m => {
+        if (modulosActivos.includes(m.id)) newSelected.add(m.id);
+      });
+      console.log('[loadTenant] modulosActivos:', modulosActivos);
+      console.log('[loadTenant] newSelected:', Array.from(newSelected));
+      setSelected(new Set(newSelected));
+      setLoadResult('ok');
+      // Delay para que React procese setSelected antes de cambiar el step
+      setTimeout(() => setStep('select'), 50);
+    } catch {
+      setLoadResult('error');
+    } finally {
+      setLoadingTenant(false);
+    }
+  };
+
+  const handleApplyToTenant = async () => {
+    if (!tenantSlug.trim()) return;
+    setApplyingTenant(true);
+    setApplyResult(null);
+    try {
+      const modulosSeleccionados = MODULES
+        .filter(m => selected.has(m.id) || m.required)
+        .map(m => m.id);
+      const { error } = await charlieSupabase
+        .from('tenant_config')
+        .update({ modulos: modulosSeleccionados })
+        .eq('tenant_id', tenantSlug.trim());
+      if (error) throw new Error(error.message);
+      setApplyResult('ok');
+    } catch (err) {
+      console.error('[Constructor] Error aplicando tenant:', err);
+      setApplyResult('error');
+    } finally {
+      setApplyingTenant(false);
+    }
+  };
 
   const resetAll = () => { setStep('select'); setProjectName(''); setSelected(new Set()); setSelectedSubs({}); setExpanded(new Set()); setStoreName(''); setStoreTagline(''); setStoreCurrency('USD'); setPrimaryColor('#FF6835'); setSecondaryColor('#111111'); setBgColor('#FFFFFF'); setHomeSections(DEFAULT_HOME_SECTIONS); setSfPages(DEFAULT_STOREFRONT_PAGES); };
 
@@ -607,7 +669,7 @@ export function ConstructorView({ onNavigate }: Props) {
                         </span>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.68rem', color: C.gray400 }}>
                           <Clock size={9} />
-                          {new Date(savedMeta.savedAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(savedMeta.savedAt).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     </div>
@@ -759,6 +821,18 @@ export function ConstructorView({ onNavigate }: Props) {
                 ref={portalRef}
                 style={{ position: 'fixed', ...posStyle, left: portalPos.left, width: portalPos.width, zIndex: 9999, backgroundColor: C.white, border: `1px solid ${pColor}`, borderRadius: '10px', boxShadow: '0 16px 40px rgba(0,0,0,0.20)', maxHeight: maxH, overflowX: 'hidden', overflowY: 'auto' }}
               >
+                {/* ── Cabecera con título y botón cerrar ── */}
+                <div style={{ position: 'sticky', top: 0, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px 7px 14px', backgroundColor: `${pColor}10`, borderBottom: `1px solid ${pColor}30` }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: '700', color: pColor, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{openCat}</span>
+                  <button
+                    onClick={() => setOpenCat(null)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', borderRadius: '4px', border: `1px solid ${pColor}40`, backgroundColor: 'transparent', cursor: 'pointer', color: pColor, padding: 0, transition: 'background-color 0.1s' }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = `${pColor}20`)}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                  >
+                    <X size={11} strokeWidth={2.5} />
+                  </button>
+                </div>
                 {pRowMods.map((mod, mi) => {
                   const sel        = selected.has(mod.id) || !!mod.required;
                   const exp        = expandedMods.has(mod.id);
@@ -1180,6 +1254,51 @@ export function ConstructorView({ onNavigate }: Props) {
                 ))}
               </div>
             </div>
+
+            {/* Aplicar a tenant */}
+              <div style={{ marginTop: '24px', padding: '20px', backgroundColor: C.orange10, borderRadius: '12px', border: `1px solid ${C.orange20}` }}>
+                <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: '0.875rem', color: C.orange }}>
+                  Aplicar módulos a un tenant
+                </p>
+                <p style={{ margin: '0 0 12px', fontSize: '0.8rem', color: C.gray500 }}>
+                  Actualiza tenant_config.modulos en Supabase Charlie para el tenant indicado.
+                </p>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={tenantSlug}
+                    onChange={e => { setTenantSlug(e.target.value); setApplyResult(null); setLoadResult(null); }}
+                    placeholder="slug del tenant (ej: oddy)"
+                    style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: `1px solid ${C.gray200}`, fontSize: '0.875rem', outline: 'none' }}
+                  />
+                  <button
+                    onClick={loadTenant}
+                    disabled={!tenantSlug.trim() || loadingTenant}
+                    style={btnGhost}
+                  >
+                    {loadingTenant ? 'Cargando...' : '← Cargar'}
+                  </button>
+                  <button
+                    onClick={handleApplyToTenant}
+                    disabled={!tenantSlug.trim() || applyingTenant}
+                    style={btnPrimary(!!tenantSlug.trim() && !applyingTenant)}
+                  >
+                    {applyingTenant ? 'Aplicando...' : 'Aplicar →'}
+                  </button>
+                </div>
+                {applyResult === 'ok' && (
+                  <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: C.green, fontWeight: 600 }}>
+                    ✅ Módulos aplicados correctamente a "{tenantSlug}"
+                  </p>
+                )}
+                {applyResult === 'error' && (
+                  <p style={{ margin: '8px 0 0', fontSize: '0.8rem', color: C.red, fontWeight: 600 }}>
+                    ❌ Error al aplicar. Verificá que el tenant existe.
+                  </p>
+                )}
+                {loadResult === 'ok'  && <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: '#16A34A' }}>✅ Módulos de "{tenantSlug}" cargados — revisá y modificá en el paso 1</p>}
+                {loadResult === 'error' && <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: C.red }}>❌ Tenant no encontrado. Verificá el slug.</p>}
+              </div>
 
             {/* Footer */}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'space-between', paddingBottom: '8px' }}>

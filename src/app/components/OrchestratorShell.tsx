@@ -8,6 +8,7 @@
 
 import React from 'react';
 import { useOrchestrator } from '../../shells/DashboardShell/app/providers/OrchestratorProvider';
+export { useOrchestrator };
 import type { MainSection } from '../AdminDashboard';
 import { MODULE_MANIFEST } from '../utils/moduleManifest';
 
@@ -20,12 +21,22 @@ export function OrchestratorShell({ activeSection, onNavigate }: OrchestratorShe
   const { config } = useOrchestrator();
   const modulos = config?.modulos ?? [];
   
-  const TOP_LEVEL = ['dashboard','ecommerce','logistica','marketing',
-    'herramientas','gestion','sistema','integraciones','auditoria',
-    'rrss','constructor','paginas','orquestador'];
-  
+  const MODULOS_POR_AREA: Record<string, string[]> = {
+    logistica:   ['transportistas', 'conductores', 'tramos', 'tarifas', 'logistica'],
+    ecommerce:   ['ecommerce', 'productos', 'pedidos'],
+    marketing:   ['marketing', 'rrss'],
+    sistema:     ['herramientas', 'gestion', 'sistema', 'integraciones', 'auditoria'],
+    constructor: ['constructor'],
+  };
+  const TOP_LEVEL = Object.keys(MODULOS_POR_AREA);
   const esTopLevel = TOP_LEVEL.includes(activeSection);
-  const moduloActivo = !esTopLevel || modulos.length === 0 || modulos.includes(activeSection);
+  const todosHabilitados = modulos.includes('*');
+  const moduloActivo = (() => {
+    if (todosHabilitados || modulos.length === 0) return true;
+    if (!esTopLevel) return modulos.includes(activeSection);
+    const modulosDelArea = MODULOS_POR_AREA[activeSection] ?? [];
+    return modulosDelArea.some(m => modulos.includes(m));
+  })();
   
   if (!moduloActivo) {
     return (

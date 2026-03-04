@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    AbastecimientoView — Abastecimiento / MRP
    OC Automáticas · Stock de Reserva · MRP
    ===================================================== */
@@ -11,7 +11,7 @@ import {
   RefreshCw, Zap, ArrowRight, ArrowUp, ArrowDown,
   AlertCircle, Settings, Loader2,
 } from 'lucide-react';
-import { getAlertasStock, getOrdenesCompra, getMRPComponentes, type AlertaStock as AlertaStockApi, type SugerenciaOC as SugerenciaOCApi, type ComponenteMRP as ComponenteMRPApi } from '../../../services/abastecimientoApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
 
 interface Props { onNavigate: (s: MainSection) => void; }
 const ORANGE = '#FF6835';
@@ -67,6 +67,7 @@ const ESTADO_OC_CFG: Record<EstadoOC, { label: string; color: string; bg: string
 };
 
 export function AbastecimientoView({ onNavigate }: Props) {
+  const supabase = useSupabaseClient();
   const [tab, setTab] = useState<Tab>('alertas');
   const [search, setSearch] = useState('');
   const [alertas, setAlertas] = useState<AlertaStock[]>([]);
@@ -80,14 +81,22 @@ export function AbastecimientoView({ onNavigate }: Props) {
   }, []);
 
   const loadData = async () => {
+    if (!supabase) return;
     setLoading(true);
     setError(null);
     try {
-      const [alertasData, ocData, mrpData] = await Promise.all([
-        getAlertasStock(true),
-        getOrdenesCompra(),
-        getMRPComponentes()
+      const [{ data: rawAlertas, error: errAl }, { data: rawOC, error: errOC }, { data: rawMRP, error: errMRP }] = await Promise.all([
+        supabase.from('abastecimiento_alertas').select('*').order('nivel'),
+        supabase.from('abastecimiento_ordenes_compra').select('*').order('created_at', { ascending: false }),
+        supabase.from('abastecimiento_mrp').select('*'),
       ]);
+      if (errAl) throw errAl;
+      if (errOC) throw errOC;
+      if (errMRP) throw errMRP;
+
+      const alertasData = (rawAlertas ?? []) as any[];
+      const ocData = (rawOC ?? []) as any[];
+      const mrpData = (rawMRP ?? []) as any[];
 
       const adaptedAlertas: AlertaStock[] = alertasData.map(a => ({
         sku: a.sku || '',
@@ -186,7 +195,7 @@ export function AbastecimientoView({ onNavigate }: Props) {
       <OrangeHeader
         icon={ShoppingCart}
         title="Abastecimiento"
-        subtitle={`${criticos} alertas críticas · ${bajos} alertas bajas · OCs sugeridas: $${valorOCSugeridas.toLocaleString('es-AR')}`}
+        subtitle={`${criticos} alertas críticas · ${bajos} alertas bajas · OCs sugeridas: $${valorOCSugeridas.toLocaleString('es-UY')}`}
         actions={[
           { label: '← Logística', onClick: () => onNavigate('logistica') },
           { label: '+ OC Manual', primary: true },
@@ -288,7 +297,7 @@ export function AbastecimientoView({ onNavigate }: Props) {
           {tab === 'oc_sugeridas' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ fontSize: '13px', color: '#6B7280' }}>{SUGERENCIAS_OC.length} órdenes de compra · Total: <strong style={{ color: '#111' }}>${SUGERENCIAS_OC.reduce((s,o)=>s+o.total,0).toLocaleString('es-AR')}</strong></span>
+                <span style={{ fontSize: '13px', color: '#6B7280' }}>{SUGERENCIAS_OC.length} órdenes de compra · Total: <strong style={{ color: '#111' }}>${SUGERENCIAS_OC.reduce((s,o)=>s+o.total,0).toLocaleString('es-UY')}</strong></span>
                 <button style={{ padding: '8px 16px', border: 'none', borderRadius: '8px', backgroundColor: ORANGE, color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Zap size={13} /> Aprobar todas las sugeridas
                 </button>
@@ -305,8 +314,8 @@ export function AbastecimientoView({ onNavigate }: Props) {
                       </div>
                       <div style={{ display: 'flex', gap: '16px', fontSize: '11px', color: '#6B7280', flexWrap: 'wrap' }}>
                         <span>🏭 {oc.proveedor}</span>
-                        <span>📦 {oc.cantidad} u × ${oc.precioUnit.toLocaleString('es-AR')}</span>
-                        <span style={{ color: '#111', fontWeight: 700 }}>💰 Total: ${oc.total.toLocaleString('es-AR')}</span>
+                        <span>📦 {oc.cantidad} u × ${oc.precioUnit.toLocaleString('es-UY')}</span>
+                        <span style={{ color: '#111', fontWeight: 700 }}>💰 Total: ${oc.total.toLocaleString('es-UY')}</span>
                         <span>⚠ {oc.motivoOC}</span>
                         <span>📅 {oc.fechaSugerida}</span>
                       </div>

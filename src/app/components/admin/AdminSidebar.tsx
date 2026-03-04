@@ -1,4 +1,4 @@
-/* =====================================================
+﻿/* =====================================================
    AdminSidebar — navegación plana, sin sub-menús, sin scroll
    ===================================================== */
 import React from 'react';
@@ -14,24 +14,27 @@ const ORANGE    = '#FF6835';
 const ACTIVE_BG = 'rgba(255,255,255,0.22)';
 const HOVER_BG  = 'rgba(255,255,255,0.12)';
 
-interface NavItem {
-  id: MainSection;
-  icon: React.ElementType;
+interface NavArea {
+  id: string;
   label: string;
+  items: [];
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard',     icon: LayoutDashboard, label: 'Dashboard'           },
-  { id: 'ecommerce',     icon: ShoppingCart,    label: 'eCommerce'           },
-  { id: 'logistica',     icon: Truck,           label: 'Logística'           },
-  { id: 'marketing',     icon: Megaphone,       label: 'Marketing'           },
-  { id: 'rrss',          icon: Rss,             label: 'RRSS'                },
-  { id: 'herramientas',  icon: Wrench,          label: 'Herramientas'        },
-  { id: 'gestion',       icon: Database,        label: 'Gestión'             },
-  { id: 'sistema',       icon: Monitor,         label: 'Sistema'             },
-  { id: 'integraciones', icon: Plug,            label: 'Integraciones'       },
-  { id: 'auditoria',     icon: Search,          label: 'Auditoría'           },
+const AREAS: NavArea[] = [
+  { id: 'logistica',   label: 'Logística',   items: [] },
+  { id: 'ecommerce',   label: 'eCommerce',   items: [] },
+  { id: 'marketing',   label: 'Marketing',   items: [] },
+  { id: 'sistema',     label: 'Sistema',     items: [] },
+  { id: 'constructor', label: 'Constructor', items: [] },
 ];
+
+const MODULOS_POR_AREA: Record<string, string[]> = {
+  logistica:   ['transportistas', 'conductores', 'tramos', 'tarifas', 'logistica'],
+  ecommerce:   ['ecommerce', 'productos', 'pedidos'],
+  marketing:   ['marketing', 'rrss'],
+  sistema:     ['herramientas', 'gestion', 'sistema', 'integraciones', 'auditoria'],
+  constructor: ['constructor'],
+};
 
 interface Props {
   activeSection: MainSection;
@@ -46,14 +49,12 @@ export function AdminSidebar({ activeSection, onNavigate }: Props) {
   const colorPrimario = config?.theme?.primary ?? '#FF6B35';
   const modulosConfig = config?.modulos ?? [];
   
-  // Filtrar NAV_ITEMS basado en config.modulos
-  // Si modulosConfig está vacío, mostrar todos los módulos (comportamiento por defecto)
-  const navItems = modulosConfig.length > 0
-    ? NAV_ITEMS.filter(item => modulosConfig.includes(item.id))
-    : NAV_ITEMS;
-  
-  /* resolve which top-level hub "owns" the current section */
-  const activeHub = (navItems.find(n => n.id === activeSection)?.id ?? activeSection) as MainSection;
+  const todosHabilitados = modulosConfig.includes('*');
+  const areasVisibles = AREAS.filter(area => {
+    if (todosHabilitados || modulosConfig.length === 0) return true;
+    const modulosDelArea = MODULOS_POR_AREA[area.id] ?? [];
+    return modulosDelArea.some(m => modulosConfig.includes(m));
+  });
 
   return (
     <aside
@@ -113,90 +114,40 @@ export function AdminSidebar({ activeSection, onNavigate }: Props) {
 
       {/* ── Nav ── */}
       <nav style={{ flex: 1, padding: '6px 0', overflowY: 'auto' }}>
-        {navItems.map(item => {
-          const isActive = activeSection === item.id || activeHub === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '9px 16px',
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: isActive ? ACTIVE_BG : 'transparent',
-                color: '#fff',
-                borderLeft: isActive ? '3px solid #fff' : '3px solid transparent',
-                transition: 'all 0.14s',
-              }}
-              onMouseEnter={e => {
-                if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = HOVER_BG;
-              }}
-              onMouseLeave={e => {
-                if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
-              }}
-            >
-              <item.icon size={16} strokeWidth={isActive ? 2.5 : 2} style={{ flexShrink: 0 }} />
-              <span style={{
-                fontSize: '0.84rem',
-                fontWeight: isActive ? '700' : '500',
-                textAlign: 'left',
-                whiteSpace: 'nowrap',
-              }}>
-                {item.label}
-              </span>
-            </button>
-          );
-        })}
-
-        {/* ── Divisor Constructor ── */}
-        <div style={{
-          margin: '8px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.25)',
-        }} />
-
-        {/* ── Constructor ── */}
-        {(() => {
-          const isActive = activeSection === 'constructor';
-          return (
-            <button
-              onClick={() => onNavigate('constructor')}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '9px 16px',
-                border: 'none',
-                cursor: 'pointer',
-                backgroundColor: isActive ? 'rgba(0,0,0,0.18)' : 'transparent',
-                color: '#000',
-                borderLeft: isActive ? '3px solid #000' : '3px solid transparent',
-                transition: 'all 0.14s',
-              }}
-              onMouseEnter={e => {
-                if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(0,0,0,0.10)';
-              }}
-              onMouseLeave={e => {
-                if (!isActive) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
-              }}
-            >
-              <Blocks size={16} strokeWidth={isActive ? 2.5 : 2} style={{ flexShrink: 0 }} />
-              <span style={{
-                fontSize: '0.84rem',
-                fontWeight: isActive ? '700' : '600',
-                textAlign: 'left',
-                whiteSpace: 'nowrap',
-                color: '#000',
-              }}>
-                Constructor
-              </span>
-            </button>
-          );
-        })()}
+          {areasVisibles.map((area) => {
+            const isActive = activeSection === area.id ||
+              (MODULOS_POR_AREA[area.id] ?? []).includes(activeSection);
+            return (
+              <button
+                key={area.id}
+                onClick={() => onNavigate(area.id as MainSection)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  width: '100%',
+                  padding: '9px 16px',
+                  border: 'none',
+                  backgroundColor: isActive ? ACTIVE_BG : 'transparent',
+                  color: '#fff',
+                  fontSize: '13px',
+                  fontWeight: isActive ? 700 : 400,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  borderRadius: '6px',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = HOVER_BG;
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                <span style={{ fontSize: '13px' }}>{area.label}</span>
+              </button>
+            );
+          })}
       </nav>
 
       {/* ── Tip ── */}

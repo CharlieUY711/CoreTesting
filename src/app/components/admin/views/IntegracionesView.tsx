@@ -47,8 +47,8 @@ export function IntegracionesView({ onNavigate }: Props) {
     {
       id: 'integraciones-logistica', icon: Truck, onClick: nav('integraciones-logistica'),
       gradient: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', color: '#10B981',
-      badge: '🇺🇾 Uruguay · 🇦🇷 Argentina', label: 'Logística',
-      description: 'Correo UY, OCA, Brixo, Mosca, PedidosYa, Fedex, DHL, Andreani y más. Soporte sin API.',
+      badge: '🇺🇾 Uruguay', label: 'Logística',
+      description: 'Correo UY, Brixo, Mosca, PedidosYa, Fedex, DHL y más. Soporte sin API.',
       stats: [
         { icon: Truck, value: loading ? '...' : String(getCountByTipo('logistica')), label: 'Proveedores' },
         { icon: CheckCircle, value: loading ? '...' : String(getActiveByTipo('logistica')), label: 'Conectadas' },
@@ -136,7 +136,7 @@ export function IntegracionesView({ onNavigate }: Props) {
       <div>
         <span style={{ fontWeight: '700', fontSize: '0.85rem', color: '#111827' }}>Uruguay First</span>
         <span style={{ fontSize: '0.8rem', color: '#6B7280', marginLeft: '8px' }}>
-          Empezamos por los proveedores del mercado uruguayo y expandimos progresivamente a Argentina, Brasil y Latam.
+          Empezamos por los proveedores del mercado uruguayo y expandimos progresivamente a Brasil y Latam.
         </span>
       </div>
     </div>

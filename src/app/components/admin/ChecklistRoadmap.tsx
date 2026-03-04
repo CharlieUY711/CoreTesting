@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+﻿import React, { useState, useMemo, useEffect } from "react";
 import {
   CheckCircle2,
   Circle,
@@ -41,6 +41,7 @@ import { AuditPanel } from "./AuditPanel";
 import { ModuleFilesPanel } from "./ModuleFilesPanel";
 import { BUILT_MODULE_IDS, SUPABASE_MODULE_IDS } from "../../utils/moduleRegistry";
 import * as roadmapApi from "../../services/roadmapApi";
+import { useOrchestrator } from '../OrchestratorShell';
 
 type ModuleStatus =
   | "not-started"
@@ -88,15 +89,18 @@ interface Module {
   submodules?: SubModule[];
   execOrder?: number;
   notas?: string;
+  updated_at?: string;
+  tiene_view?: boolean;
+  tiene_backend?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CATEGORY INFO
 // ─────────────────────────────────────────────────────────────────────────────
-// ⚠️ El orden de este objeto define el orden en la vista Lista � espeja el AdminSidebar.
+// ⚠️ El orden de este objeto define el orden en la vista Lista — espeja el AdminSidebar.
 const CATEGORY_INFO: Record<ModuleCategory, { label: string; color: string; icon: string }> = {
   ecommerce:    { label: "eCommerce / Pedidos",   color: "bg-orange-500",  icon: "🛒" },
-  logistics:    { label: "Log�stica",             color: "bg-green-600",   icon: "??" },
+  logistics:    { label: "Logística",             color: "bg-green-600",   icon: "??" },
   marketing:    { label: "Marketing",             color: "bg-pink-500",    icon: "📢" },
   rrss:         { label: "Redes Sociales",        color: "bg-rose-500",    icon: "📱" },
   tools:        { label: "Herramientas",          color: "bg-teal-500",    icon: "🛠️" },
@@ -105,11 +109,11 @@ const CATEGORY_INFO: Record<ModuleCategory, { label: string; color: string; icon
   projects:     { label: "Proyectos",             color: "bg-indigo-600",  icon: "📋" },
   marketplace:  { label: "Marketplace",           color: "bg-amber-500",   icon: "🏪" },
   integrations: { label: "Integraciones",           color: "bg-cyan-600",    icon: "🔌" },
-  audit:        { label: "Auditor�a & Diagn�stico", color: "bg-violet-600",  icon: "🔍" },
+  audit:        { label: "Auditoría & Diagnóstico", color: "bg-violet-600",  icon: "🔍" },
   admin:        { label: "Admin / Sistema",         color: "bg-slate-600",   icon: "⚙️" },
   enterprise:   { label: "Enterprise",            color: "bg-red-600",     icon: "🏢" },
   territory:    { label: "Territorio",            color: "bg-lime-600",    icon: "🗺️" },
-  verification: { label: "Verificaci�n",          color: "bg-yellow-600",  icon: "?" },
+  verification: { label: "Verificación",          color: "bg-yellow-600",  icon: "?" },
   analytics:    { label: "Analytics & BI",        color: "bg-sky-600",     icon: "📈" },
   builder:      { label: "Constructor",           color: "bg-fuchsia-600", icon: "🔧" },
 };
@@ -119,11 +123,11 @@ const CATEGORY_INFO: Record<ModuleCategory, { label: string; color: string; icon
 // ─────────────────────────────────────────────────────────────────────────────
 const STATUS_INFO: Record<ModuleStatus, { label: string; color: string; icon: any; percent: number }> = {
   "not-started":  { label: "No Iniciado",            color: "text-gray-400",    icon: Circle,       percent: 0   },
-  "spec-ready":   { label: "Definici�n Lista",        color: "text-violet-600",  icon: FileCheck2,   percent: 15  },
+  "spec-ready":   { label: "Definición Lista",        color: "text-violet-600",  icon: FileCheck2,   percent: 15  },
   "progress-10":  { label: "En Progreso (10%)",       color: "text-red-500",     icon: AlertCircle,  percent: 10  },
   "progress-50":  { label: "En Progreso (50%)",       color: "text-yellow-500",  icon: Clock,        percent: 50  },
   "progress-80":  { label: "En Progreso (80%)",       color: "text-blue-500",    icon: TrendingUp,   percent: 80  },
-  "ui-only":      { label: "UI Lista � Sin Backend",  color: "text-blue-500",    icon: Monitor,      percent: 80  },
+  "ui-only":      { label: "UI Lista — Sin Backend",  color: "text-blue-500",    icon: Monitor,      percent: 80  },
   "completed":    { label: "Completado (con DB)",     color: "text-[#FF6835]",   icon: CheckCircle2, percent: 100 },
 };
 
@@ -131,7 +135,7 @@ const STATUS_INFO: Record<ModuleStatus, { label: string; color: string; icon: an
 // PRIORITY INFO
 // ─────────────────────────────────────────────────────────────────────────────
 const PRIORITY_INFO: Record<ModulePriority, { label: string; color: string }> = {
-  critical: { label: "Cr�tica",  color: "text-red-600 border-red-300 bg-red-50"       },
+  critical: { label: "Crítica",  color: "text-red-600 border-red-300 bg-red-50"       },
   high:     { label: "Alta",     color: "text-orange-600 border-orange-300 bg-orange-50" },
   medium:   { label: "Media",    color: "text-yellow-600 border-yellow-300 bg-yellow-50" },
   low:      { label: "Baja",     color: "text-gray-500 border-gray-300 bg-gray-50"    },
@@ -149,7 +153,7 @@ function getProgressBarColor(pct: number, status?: ModuleStatus): string {
   return "bg-green-500";
 }
 
-/** % real de un m�dulo = promedio ponderado de subm�dulos (si tiene); si no, el del selector. */
+/** % real de un módulo = promedio ponderado de submódulos (si tiene); si no, el del selector. */
 function getEffectivePercent(module: Module): number {
   if (!module.submodules || module.submodules.length === 0) {
     return STATUS_INFO[module.status].percent;
@@ -164,18 +168,23 @@ function getEffectivePercent(module: Module): number {
 }
 
 /**
- * Aplica el estado correcto seg�n manifest:
+ * Aplica el estado correcto según manifest:
  *  - BUILT + hasSupabase=true  ? "completed"  (100% 🗄️)
- *  - BUILT + hasSupabase=false ? "ui-only"    (80%  🖥️ � hay UI pero falta backend)
- *  - No est� en BUILT          ? sin cambio   (mantiene estado manual)
+ *  - BUILT + hasSupabase=false ? "ui-only"    (80%  🖥️ — hay UI pero falta backend)
+ *  - No está en BUILT          ? sin cambio   (mantiene estado manual)
  */
 function applyBuiltStatus(m: Module): Module {
-  if (!BUILT_MODULE_IDS.has(m.id)) return m;
-  const newStatus: ModuleStatus = SUPABASE_MODULE_IDS.has(m.id) ? "completed" : "ui-only";
+  const hasView     = BUILT_MODULE_IDS.has(m.id);
+  const hasSupabase = SUPABASE_MODULE_IDS.has(m.id);
+  // Solo inferir status si la BD dice not-started (nunca fue editado manualmente)
+  const inferredStatus: ModuleStatus = hasSupabase ? "completed" : hasView ? "ui-only" : m.status;
+  const finalStatus = m.status === "not-started" ? inferredStatus : m.status;
   return {
     ...m,
-    status: newStatus,
-    submodules: m.submodules?.map(sub => ({ ...sub, status: newStatus })),
+    tiene_view:    hasView,
+    tiene_backend: hasSupabase,
+    status: finalStatus,
+    submodules: m.submodules?.map(sub => ({ ...sub, status: finalStatus })),
   };
 }
 
@@ -209,6 +218,8 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
   const [showRoadmapPanel, setShowRoadmapPanel] = useState(false);
   const [modules, setModules] = useState<Module[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { config } = useOrchestrator();
+  const modulosHabilitados: string[] = config?.modulos ?? [];
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
@@ -217,7 +228,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
   const [auditProgress, setAuditProgress] = useState({ current: 0, total: 0 });
   const [allExpanded, setAllExpanded] = useState(false);
   
-  // Mapa de endpoints y tablas por m�dulo para auditor�a
+  // Mapa de endpoints y tablas por módulo para auditoría
   const AUDIT_MAP: Record<string, { endpointUrl?: string; tableName?: string }> = {
     "ecommerce-pedidos":        { endpointUrl: `/api/pedidos`,          tableName: "pedidos" },
     "ecommerce-metodos-pago":   { endpointUrl: `/api/metodos-pago`,     tableName: "metodos_pago" },
@@ -263,7 +274,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
       if (estado === 'convertida') {
         await loadModules();
       }
-      toast.success(`Idea ${estado === 'aprobada' ? 'aprobada' : estado === 'rechazada' ? 'rechazada' : 'convertida a m�dulo'}`);
+      toast.success(`Idea ${estado === 'aprobada' ? 'aprobada' : estado === 'rechazada' ? 'rechazada' : 'convertida a módulo'}`);
     } catch (err) {
       toast.error('Error resolviendo idea');
     }
@@ -276,7 +287,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
       const savedModules = await roadmapApi.getModules();
       
       if (savedModules && savedModules.length > 0) {
-        // Aplicar cascade de BUILT_MODULE_IDS a los m�dulos de la API
+        // Aplicar cascade de BUILT_MODULE_IDS a los módulos de la API
         const processed = savedModules.map((m) => {
           const module: Module = {
             id: m.id,
@@ -288,6 +299,9 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
             execOrder: m.execOrder,
             estimatedHours: m.estimatedHours,
             notas: m.notas,
+            updated_at: m.updated_at,
+            tiene_view: m.tiene_view,
+            tiene_backend: m.tiene_backend,
             submodules: m.submodules?.map(sub => ({
               id: sub.id,
               name: sub.name,
@@ -297,9 +311,12 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
           };
           return applyBuiltStatus(module);
         });
-        setModules(processed);
+        const filtered = modulosHabilitados.length > 0
+          ? processed.filter(m => modulosHabilitados.includes(m.id))
+          : processed;
+        setModules(filtered);
       } else {
-        // SQL vac�o ? no hay m�dulos
+        // SQL vacío ? no hay módulos
         setModules([]);
       }
     } catch {
@@ -309,7 +326,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
     }
   };
 
-  // ── updateModuleStatus con cascade a subm�dulos y gesti�n de execOrder ──
+  // ── updateModuleStatus con cascade a submódulos y gestión de execOrder ──
   const updateModuleStatus = async (moduleId: string, newStatus: ModuleStatus) => {
     const maxOrder = modules
       .filter(m => m.status === "spec-ready" && m.id !== moduleId)
@@ -333,7 +350,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
       };
     });
 
-    // Si se quit� de spec-ready, renumerar los que quedan
+    // Si se quitó de spec-ready, renumerar los que quedan
     let finalModules = updated;
     if (oldModule?.status === "spec-ready" && newStatus !== "spec-ready") {
       const queueItems = updated
@@ -363,7 +380,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
     } catch { /* silent */ }
   };
 
-  // ── Mover en la cola de ejecuci�n ───────────────────────────────────────
+  // ── Mover en la cola de ejecución ───────────────────────────────────────
   const moveInQueue = (moduleId: string, direction: "up" | "down") => {
     const queue = [...modules]
       .filter(m => m.status === "spec-ready")
@@ -417,7 +434,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
         // Luego recargar desde la API
         await loadModules();
       } else {
-        toast.success("?? Estad�sticas actualizadas desde el manifest");
+        toast.success("?? Estadísticas actualizadas desde el manifest");
       }
       setHasUnsavedChanges(false);
     } catch (err) {
@@ -508,7 +525,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
     }
   };
 
-  // ── Auditor�a autom�tica ────────────────────────────────────────────────
+  // ── Auditoría automática ────────────────────────────────────────────────
   const runAudit = async () => {
     if (!projectId) {
       toast.warning("⚠️ Supabase no conectado");
@@ -526,7 +543,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
         const tieneView = BUILT_MODULE_IDS.has(mod.id);
         const tieneBackend = SUPABASE_MODULE_IDS.has(mod.id);
         
-        // Ejecutar auditor�a completa (incluye tiene_view y tiene_backend)
+        // Ejecutar auditoría completa (incluye tiene_view y tiene_backend)
         const endpointUrl = auditInfo.endpointUrl 
           ? `https://${projectId}.supabase.co/functions/v1${auditInfo.endpointUrl}`
           : undefined;
@@ -542,20 +559,20 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
       
       await Promise.all(auditPromises);
       
-      // Recargar m�dulos para ver los cambios
+      // Recargar módulos para ver los cambios
       await loadModules();
       
-      toast.success(`✅ Auditor�a completada � ${modules.length} m�dulos verificados`);
+      toast.success(`✅ Auditoría completada — ${modules.length} módulos verificados`);
     } catch (err) {
-      console.error("[ChecklistRoadmap] Error en auditor�a:", err);
-      toast.error("❌ Error durante la auditor�a");
+      console.error("[ChecklistRoadmap] Error en auditoría:", err);
+      toast.error("❌ Error durante la auditoría");
     } finally {
       setIsAuditing(false);
       setAuditProgress({ current: 0, total: 0 });
     }
   };
 
-  // ── Stats globales (usa getEffectivePercent para honrar subm�dulos) ────────
+  // ── Stats globales (usa getEffectivePercent para honrar submódulos) ────────
   const stats = useMemo(() => {
     const total = modules.length;
     const completed  = modules.filter((m) => getEffectivePercent(m) === 100).length;
@@ -567,11 +584,15 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
     const completedHours = modules
       .filter((m) => getEffectivePercent(m) === 100)
       .reduce((s, m) => s + (m.estimatedHours || 0), 0);
-    const progressPercent = modules.reduce((sum, m) => {
-      const pct = getEffectivePercent(m);
-      const w = (m.estimatedHours || 1) / Math.max(totalHours, 1);
-      return sum + pct * w;
-    }, 0);
+    const progressPercent = total === 0 ? 0 : (
+      totalHours > 0
+        ? modules.reduce((sum, m) => {
+            const pct = getEffectivePercent(m);
+            const w = (m.estimatedHours || 0) / totalHours;
+            return sum + pct * w;
+          }, 0)
+        : modules.reduce((sum, m) => sum + getEffectivePercent(m), 0) / total
+    );
     return {
       total, completed, uiOnly, specReady, notStarted, inProgress,
       completedPercent: Math.round((completed / total) * 100),
@@ -581,7 +602,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
     };
   }, [modules]);
 
-  // ── M�dulos filtrados ─────────────────────────────────────────────────────
+  // ── Módulos filtrados ─────────────────────────────────────────────────────
   const filteredModules = useMemo(() => {
     return modules.filter((m) => {
       if (searchTerm && !m.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
@@ -593,7 +614,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
     });
   }, [modules, searchTerm, selectedCategory, selectedStatus, selectedPriority]);
 
-  // ── Agrupado por �rea ─────────────────────────────────────────────────────
+  // ── Agrupado por área ─────────────────────────────────────────────────────
   const groupedByCategory = useMemo(() => {
     return (Object.keys(CATEGORY_INFO) as ModuleCategory[]).reduce<
       Array<{ cat: ModuleCategory; mods: Module[]; areaStats: { total: number; completed: number; inProgress: number; pct: number; hours: number } }>
@@ -617,7 +638,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
     }, []);
   }, [filteredModules]);
 
-  // Cuando hay b�squeda o filtro activo ? expandir todo autom�ticamente
+  // Cuando hay búsqueda o filtro activo ? expandir todo automáticamente
   const effectiveExpanded = useMemo(() => {
     if (searchTerm.trim() || selectedCategory !== "all" || selectedStatus !== "all" || selectedPriority !== "all") {
       return new Set(Object.keys(CATEGORY_INFO));
@@ -723,7 +744,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                 {idea.idea_area || 'General'}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                {new Date(idea.created_at).toLocaleDateString('es-AR')}
+                                {new Date(idea.created_at).toLocaleDateString('es-UY')}
                               </span>
                             </div>
                             <p className="text-sm text-foreground mb-2">{idea.idea_texto}</p>
@@ -962,7 +983,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
               <button
                 onClick={forceResyncFromManifest}
                 disabled={isSyncing}
-                title="Resincroniza estad�sticas desde el manifest � corrige estados stale del backend"
+                title="Resincroniza estadísticas desde el manifest — corrige estados stale del backend"
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors text-sm font-medium disabled:opacity-50"
               >
                 <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
@@ -972,7 +993,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                 onClick={() => setShowAudit(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-orange-50 hover:border-[#FF6835]/40 text-gray-600 hover:text-[#FF6835] transition-colors text-sm font-medium"
               >
-                <ScanSearch className="h-4 w-4" /> Auditor�a
+                <ScanSearch className="h-4 w-4" /> Auditoría
               </button>
               <button
                 onClick={runAudit}
@@ -986,7 +1007,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                   </>
                 ) : (
                   <>
-                    <RefreshCw className="h-4 w-4" /> Auditar m�dulos
+                    <RefreshCw className="h-4 w-4" /> Auditar módulos
                   </>
                 )}
               </button>
@@ -998,7 +1019,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
               )}
             </div>
           </div>
-          <p className="text-muted-foreground">Estado completo de todos los m�dulos de Charlie Marketplace Builder</p>
+          <p className="text-muted-foreground">Estado completo de todos los módulos de Charlie Marketplace Builder</p>
         </div>
       )}
 
@@ -1073,7 +1094,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
             <button
               onClick={forceResyncFromManifest}
               disabled={isSyncing}
-              title="Resincroniza estad�sticas desde el manifest � corrige estados stale del backend"
+              title="Resincroniza estadísticas desde el manifest — corrige estados stale del backend"
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border font-semibold transition-colors disabled:opacity-50 ${
                 !hasUnsavedChanges && !isSaving
                   ? 'border-green-200 bg-green-50 hover:bg-green-100 text-green-700'
@@ -1089,7 +1110,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
               onClick={() => setShowAudit(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border border-[#FF6835]/30 bg-orange-50 hover:bg-orange-100 text-[#FF6835] font-semibold transition-colors"
             >
-              <ScanSearch className="h-3.5 w-3.5" /> Auditor�a
+              <ScanSearch className="h-3.5 w-3.5" /> Auditoría
             </button>
             <button
               onClick={toggleExpandCollapse}
@@ -1144,7 +1165,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
           <div className="text-2xl font-bold text-foreground mb-1">
             {stats.completed}/{stats.total}
           </div>
-          <div className="text-xs text-muted-foreground mb-2">{stats.completedPercent}% m�dulos con DB</div>
+          <div className="text-xs text-muted-foreground mb-2">{stats.completedPercent}% módulos con DB</div>
           {/* Mini breakdown de los 3 estados */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200">
@@ -1278,13 +1299,13 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input type="text" placeholder="Buscar m�dulo..." value={searchTerm}
+            <input type="text" placeholder="Buscar módulo..." value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6835]" />
           </div>
           <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value as any)}
             className="px-4 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6835]">
-            <option value="all">Todas las �reas</option>
+            <option value="all">Todas las áreas</option>
             {Object.entries(CATEGORY_INFO).map(([key, info]) => <option key={key} value={key}>{info.label}</option>)}
           </select>
           <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value as any)}
@@ -1301,7 +1322,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
       </div>
 
       {/* ═══════════════════════════════════════════════
-          LIST VIEW � agrupado por �rea, colapsable
+          LIST VIEW — agrupado por área, colapsable
       ═══════════════════════════════════════════════ */}
       {viewMode === "list" && (
         <div className="space-y-2">
@@ -1317,7 +1338,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                 transition={{ delay: gi * 0.03 }}
                 className="rounded-xl border border-border overflow-hidden shadow-sm"
               >
-                {/* ── Cabecera del �rea ────────────────── */}
+                {/* ── Cabecera del área ────────────────── */}
                 <button
                   onClick={() => toggleExpandCategory(cat)}
                   className={`w-full flex items-center gap-2 px-4 py-3.5 text-left transition-colors ${
@@ -1330,7 +1351,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                   {/* Chevron animado */}
                   <ChevronRight className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`} />
 
-                  {/* Contenido izquierdo � flex-1 */}
+                  {/* Contenido izquierdo — flex-1 */}
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full text-white whitespace-nowrap flex-shrink-0 ${info.color}`}>
                       {info.label}
@@ -1338,7 +1359,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                     {allDone && <CheckCircle2 className="h-4 w-4 text-[#FF6835] flex-shrink-0" />}
                   </div>
 
-                  {/* ══ BLOQUE DERECHO FIJO � id�ntico al de m�dulo ══ */}
+                  {/* ══ BLOQUE DERECHO FIJO — idÉntico al de módulo ══ */}
                   <span className="w-14 text-right text-xs text-muted-foreground flex-shrink-0 hidden lg:block">
                     {areaStats.hours > 0 ? `${areaStats.hours}h` : ""}
                   </span>
@@ -1353,7 +1374,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                   <span className="w-10 text-right text-sm font-semibold text-foreground flex-shrink-0">
                     {areaStats.pct}%
                   </span>
-                  {/* w-40 espejo de la columna de badges de m�dulo */}
+                  {/* w-40 espejo de la columna de badges de módulo */}
                   <div className="w-40 flex-shrink-0 hidden sm:flex items-center gap-2 justify-end">
                     <span className="text-xs text-muted-foreground">
                       {areaStats.completed}/{areaStats.total} mods
@@ -1364,13 +1385,13 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                       </span>
                     )}
                   </div>
-                  {/* Espejo del bot�n paperclip */}
+                  {/* Espejo del botón paperclip */}
                   <div className="w-7 flex-shrink-0" />
-                  {/* Espacio espejo del chevron de subm�dulo */}
+                  {/* Espacio espejo del chevron de submódulo */}
                   <div className="w-7 flex-shrink-0" />
                 </button>
 
-                {/* ── M�dulos del �rea ─────────────────── */}
+                {/* ── Módulos del área ─────────────────── */}
                 <AnimatePresence initial={false}>
                   {isOpen && (
                     <motion.div
@@ -1384,9 +1405,9 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                       <div className="border-t border-border divide-y divide-border/50 bg-background/40">
                         {mods.map((module) => (
                           <div key={module.id}>
-                            {/* ── Fila del m�dulo ── */}
+                            {/* ── Fila del módulo ── */}
                             <div className="flex items-center gap-2 px-4 py-2.5 hover:bg-accent/20 transition-colors">
-                              {/* Selector de estado � w-44 fijo */}
+                              {/* Selector de estado — w-44 fijo */}
                               <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 w-44">
                                 <select
                                   value={module.status}
@@ -1399,7 +1420,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                 </select>
                               </div>
 
-                              {/* Nombre + descripci�n � badges movidos al bloque derecho */}
+                              {/* Nombre + descripción — badges movidos al bloque derecho */}
                               <div className="flex-1 min-w-0">
                                 <span className="text-sm font-semibold text-foreground truncate block">{module.name}</span>
                                 {module.description && (
@@ -1423,19 +1444,26 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                 {getEffectivePercent(module)}%
                               </span>
 
-                              {/* ── Badges DESPU�S de la barra ── */}
+                              {/* ── Badges DESPUÉS de la barra ── */}
                               <div className="w-40 flex-shrink-0 hidden sm:flex items-center gap-1 flex-wrap">
                                 <span className={`text-xs px-1.5 py-0.5 rounded border flex-shrink-0 ${PRIORITY_INFO[module.priority].color}`}>
                                   {PRIORITY_INFO[module.priority].label}
                                 </span>
-                                {module.status === "completed" && (
-                                  <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-green-50 border border-green-200 text-green-700 flex-shrink-0 font-semibold">
-                                    <Database className="h-3 w-3" /> DB
+                                {module.tiene_backend && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#ECFDF5', color: '#059669', border: '1px solid #6EE7B7' }}>
+                                    🗄️ DB
                                   </span>
                                 )}
-                                {module.status === "ui-only" && (
-                                  <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-600 flex-shrink-0 font-semibold">
-                                    <Monitor className="h-3 w-3" /> UI
+                                {module.tiene_view && !module.tiene_backend && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE' }}>
+                                    🖥️ UI
+                                  </span>
+                                )}
+                                {module.updated_at && (
+                                  <span style={{ fontSize: '10px', color: '#9CA3AF', whiteSpace: 'nowrap', marginLeft: '4px' }}>
+                                    {new Date(module.updated_at).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit' })}
+                                    {' '}
+                                    {new Date(module.updated_at).toLocaleTimeString('es-UY', { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                 )}
                                 {module.status === "spec-ready" && (
@@ -1445,7 +1473,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                 )}
                               </div>
 
-                              {/* Bot�n adjuntar archivos */}
+                              {/* Botón adjuntar archivos */}
                               <div className="w-7 flex-shrink-0 flex justify-center">
                                 <button
                                   onClick={(e) => {
@@ -1479,13 +1507,13 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                     : <ListOrdered className="h-4 w-4 text-muted-foreground" />}
                                 </button>
                               </div>
-                              {/* Chevron subm�dulos */}
+                              {/* Chevron submódulos */}
                               <div className="w-7 flex-shrink-0 flex justify-center">
                                 {module.submodules ? (
                                   <button
                                     onClick={() => toggleExpand(module.id)}
                                     className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                                    title={expandedModules.has(module.id) ? "Ocultar subm�dulos" : "Ver subm�dulos"}
+                                    title={expandedModules.has(module.id) ? "Ocultar submódulos" : "Ver submódulos"}
                                   >
                                     {expandedModules.has(module.id)
                                       ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -1495,7 +1523,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                               </div>
                             </div>
 
-                            {/* ── Subm�dulos expandibles ── */}
+                            {/* ── Submódulos expandibles ── */}
                             <AnimatePresence initial={false}>
                               {module.submodules && expandedModules.has(module.id) && (
                                 <motion.div
@@ -1514,7 +1542,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                       const isWip    = pctSub > 0 && !isDone && !isUiOnly;
                                       return (
                                         <div key={sub.id} className="flex items-center gap-2 px-4 py-2 hover:bg-accent/10 transition-colors">
-                                          {/* Icono de estado � w-44 igual al selector del padre */}
+                                          {/* Icono de estado — w-44 igual al selector del padre */}
                                           <div className="w-44 flex-shrink-0 flex items-center gap-2 pl-2">
                                             {isDone    ? <CheckCircle2 className="h-5 w-5 text-[#FF6835]" />
                                             : isUiOnly ? <Monitor      className="h-5 w-5 text-blue-500" />
@@ -1593,7 +1621,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                                     {task.nombre}
                                                   </span>
                                                   {task.blocker && <span className="text-red-500 text-xs">??</span>}
-                                                  <button onClick={() => handleDeleteTask(task.id, module.id)} className="text-red-500 hover:text-red-700">�</button>
+                                                  <button onClick={() => handleDeleteTask(task.id, module.id)} className="text-red-500 hover:text-red-700">×</button>
                                                 </div>
                                               ))}
                                             </div>
@@ -1611,12 +1639,12 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                                               {task.nombre}
                                             </span>
                                             {task.blocker && <span className="text-red-500 text-xs">??</span>}
-                                            <button onClick={() => handleDeleteTask(task.id, module.id)} className="text-red-500 hover:text-red-700">�</button>
+                                            <button onClick={() => handleDeleteTask(task.id, module.id)} className="text-red-500 hover:text-red-700">×</button>
                                           </div>
                                         ))}
                                       </div>
                                     ) : (
-                                      <div className="text-xs text-muted-foreground italic">No hay tasks a�n</div>
+                                      <div className="text-xs text-muted-foreground italic">No hay tasks aún</div>
                                     )}
                                   </div>
                                 </motion.div>
@@ -1682,7 +1710,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                     </div>
                   ))}
                   {mods.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-4">Sin m�dulos</p>
+                    <p className="text-xs text-muted-foreground text-center py-4">Sin módulos</p>
                   )}
                 </div>
               </div>
@@ -1692,7 +1720,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
       )}
 
       {/* ═══════════════════════════════════════════════
-          QUEUE VIEW � Cola de ejecuci�n
+          QUEUE VIEW — Cola de ejecución
       ═══════════════════════════════════════════════ */}
       {viewMode === "queue" && (() => {
         const queue = [...modules]
@@ -1706,10 +1734,10 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                 <ListOrdered className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
-                <h2 className="text-base font-bold text-violet-900">Cola de Ejecuci�n</h2>
+                <h2 className="text-base font-bold text-violet-900">Cola de Ejecución</h2>
                 <p className="text-xs text-violet-600 mt-0.5">
-                  M�dulos con definici�n completa � ordenados por prioridad de implementaci�n.
-                  Cambi� el estado de cualquier m�dulo a <strong>"Definici�n Lista"</strong> para agregarlo.
+                  Módulos con definición completa — ordenados por prioridad de implementación.
+                  Cambió el estado de cualquier módulo a <strong>"Definición Lista"</strong> para agregarlo.
                 </p>
               </div>
               {queue.length > 0 && (
@@ -1723,10 +1751,10 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
             {queue.length === 0 ? (
               <div className="bg-card rounded-xl border border-dashed border-border p-16 text-center">
                 <Inbox className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                <p className="text-sm font-semibold text-muted-foreground">Cola vac�a</p>
+                <p className="text-sm font-semibold text-muted-foreground">Cola vacía</p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                  And� a la vista <strong>Lista</strong>, busc� un m�dulo y cambi� su estado a
-                  <span className="font-semibold text-violet-600"> "Definici�n Lista"</span> para agregarlo aqu�.
+                  Andá a la vista <strong>Lista</strong>, buscá un módulo y cambiá su estado a
+                  <span className="font-semibold text-violet-600"> "Definición Lista"</span> para agregarlo aquí.
                 </p>
               </div>
             ) : (
@@ -1741,7 +1769,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                     className="bg-card rounded-xl border border-violet-200 hover:border-violet-400 hover:shadow-md transition-all overflow-hidden"
                   >
                     <div className="flex items-center gap-3 px-4 py-3.5">
-                      {/* N�mero */}
+                      {/* Número */}
                       <div className="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center font-black text-lg flex-shrink-0 shadow-sm">
                         {idx + 1}
                       </div>
@@ -1762,7 +1790,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
 
                       {/* Horas estimadas */}
                       <div className="text-center flex-shrink-0 hidden md:block">
-                        <p className="text-sm font-bold text-foreground">{mod.estimatedHours ?? "�"}h</p>
+                        <p className="text-sm font-bold text-foreground">{mod.estimatedHours ?? "?"}h</p>
                         <p className="text-xs text-muted-foreground">estimadas</p>
                       </div>
 
@@ -1786,11 +1814,11 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                         </button>
                       </div>
 
-                      {/* Bot�n iniciar */}
+                      {/* Botón iniciar */}
                       <button
                         onClick={() => updateModuleStatus(mod.id, "progress-10")}
                         className="flex items-center gap-1.5 px-3 py-2 bg-[#FF6835] text-white rounded-lg text-xs font-bold hover:bg-[#FF6835]/90 transition-colors flex-shrink-0 shadow-sm"
-                        title="Iniciar implementaci�n (pasa a En Progreso 10%)"
+                        title="Iniciar implementación (pasa a En Progreso 10%)"
                       >
                         <Play className="h-3 w-3" /> Iniciar
                       </button>
@@ -1801,7 +1829,7 @@ export function ChecklistRoadmap({ hideHeader = false, onNavigate }: Props) {
                 {/* Footer resumen */}
                 <div className="mt-4 p-4 rounded-xl bg-violet-50 border border-violet-200 flex items-center justify-between flex-wrap gap-2">
                   <div className="text-sm text-violet-700 font-medium">
-                    <span className="font-black">{queue.length}</span> m�dulo{queue.length !== 1 ? "s" : ""} en cola
+                    <span className="font-black">{queue.length}</span> módulo{queue.length !== 1 ? "s" : ""} en cola
                     {" · "}
                     <span className="font-black">
                       {queue.reduce((s, m) => s + (m.estimatedHours ?? 0), 0)}h

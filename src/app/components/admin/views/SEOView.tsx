@@ -53,7 +53,7 @@ interface Backlink {
 }
 
 const KEYWORDS: Keyword[] = [
-  { id: 'k1', keyword: 'ropa online argentina', posicion: 4, posicionAnterior: 7, volumeMensual: 18000, dificultad: 72, ctr: 3.2, impressiones: 42000, clics: 1344, url: '/tienda/ropa' },
+  { id: 'k1', keyword: 'ropa online uruguay', posicion: 4, posicionAnterior: 7, volumeMensual: 18000, dificultad: 72, ctr: 3.2, impressiones: 42000, clics: 1344, url: '/tienda/ropa' },
   { id: 'k2', keyword: 'comprar remeras al por mayor', posicion: 2, posicionAnterior: 3, volumeMensual: 5400, dificultad: 58, ctr: 8.7, impressiones: 12000, clics: 1044, url: '/mayorista' },
   { id: 'k3', keyword: 'marketplace segunda mano', posicion: 11, posicionAnterior: 9, volumeMensual: 9800, dificultad: 65, ctr: 0.8, impressiones: 28000, clics: 224, url: '/segunda-mano' },
   { id: 'k4', keyword: 'zapatillas deportivas mujer', posicion: 6, posicionAnterior: 6, volumeMensual: 22000, dificultad: 80, ctr: 2.1, impressiones: 55000, clics: 1155, url: '/calzado/mujer' },
@@ -64,7 +64,7 @@ const KEYWORDS: Keyword[] = [
 ];
 
 const PAGINAS: PaginaSEO[] = [
-  { id: 'p1', titulo: 'Tienda de Ropa Online | Charlie Marketplace', url: '/tienda/ropa', score: 88, problemas: [], keywords: ['ropa online', 'moda argentina'], traficoOrganico: 2840, posicionPromedio: 4.2 },
+  { id: 'p1', titulo: 'Tienda de Ropa Online | Charlie Marketplace', url: '/tienda/ropa', score: 88, problemas: [], keywords: ['ropa online', 'moda uruguay'], traficoOrganico: 2840, posicionPromedio: 4.2 },
   { id: 'p2', titulo: 'Compra al Por Mayor | Mayorista', url: '/mayorista', score: 76, problemas: ['Meta description muy corta', 'Faltan keywords en H2'], keywords: ['ropa mayorista', 'comprar al por mayor'], traficoOrganico: 1890, posicionPromedio: 2.8 },
   { id: 'p3', titulo: 'Segunda Mano — Artículos Usados', url: '/segunda-mano', score: 61, problemas: ['Velocidad de carga alta (4.2s)', 'Falta schema markup', 'Imágenes sin alt text'], keywords: ['segunda mano', 'artículos usados'], traficoOrganico: 780, posicionPromedio: 11.3 },
   { id: 'p4', titulo: 'Indumentaria de Trabajo y Seguridad', url: '/trabajo', score: 94, problemas: [], keywords: ['ropa de trabajo', 'indumentaria industrial'], traficoOrganico: 3120, posicionPromedio: 1.4 },
@@ -76,7 +76,7 @@ const BACKLINKS: Backlink[] = [
   { id: 'b2', dominio: 'lanacion.com.ar', url: 'https://lanacion.com.ar/economia/...', autoridad: 88, tipo: 'dofollow', estado: 'activo', fechaDeteccion: '10/01/2024' },
   { id: 'b3', dominio: 'infobae.com', url: 'https://infobae.com/...', autoridad: 85, tipo: 'nofollow', estado: 'activo', fechaDeteccion: '05/01/2024' },
   { id: 'b4', dominio: 'pyme.com.ar', url: 'https://pyme.com.ar/moda/...', autoridad: 52, tipo: 'dofollow', estado: 'nuevo', fechaDeteccion: '17/01/2024' },
-  { id: 'b5', dominio: 'modaargentina.net', url: 'https://modaargentina.net/...', autoridad: 38, tipo: 'dofollow', estado: 'perdido', fechaDeteccion: '01/12/2023' },
+  { id: 'b5', dominio: 'modauruguay.com', url: 'https://modauruguay.com/...', autoridad: 38, tipo: 'dofollow', estado: 'perdido', fechaDeteccion: '01/12/2023' },
   { id: 'b6', dominio: 'blogmoda.ar', url: 'https://blogmoda.ar/...', autoridad: 29, tipo: 'dofollow', estado: 'activo', fechaDeteccion: '20/12/2023' },
 ];
 

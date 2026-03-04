@@ -11,7 +11,7 @@ import {
   Navigation, Users, Calendar, Edit2, Layers,
   ArrowRight, RotateCcw,
 } from 'lucide-react';
-import { getRutas, createRuta, updateRuta, deleteRuta, type Ruta, type Parada } from '../../../services/rutasApi';
+import { useSupabaseClient } from '../../../../shells/DashboardShell/app/hooks/useSupabaseClient';
 
 interface Props { onNavigate: (s: MainSection) => void; }
 const ORANGE = '#FF6835';
@@ -28,7 +28,33 @@ const ESTADO_CFG: Record<EstadoRuta, { label: string; color: string; bg: string 
 
 type Tab = 'todas' | 'standard' | 'proyecto';
 
+interface Parada {
+  id: string;
+  orden: number;
+  direccion: string;
+  localidad: string;
+  envios: number;
+  estado: 'pendiente' | 'entregado' | 'fallido';
+}
+
+interface Ruta {
+  id: string;
+  nombre: string;
+  tipo: TipoRuta;
+  estado: EstadoRuta;
+  carrier: string;
+  zona: string;
+  paradas: Parada[];
+  enviosTotales: number;
+  kmsEstimados: number;
+  tiempoEstimado: string;
+  frecuencia?: string;
+  fechaProxima?: string;
+  observaciones?: string;
+}
+
 export function RutasView({ onNavigate }: Props) {
+  const supabase = useSupabaseClient();
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,14 +64,17 @@ export function RutasView({ onNavigate }: Props) {
 
   // Cargar rutas al montar
   useEffect(() => {
+    if (!supabase) return;
     const loadRutas = async () => {
       try {
         setLoading(true);
         setError(null);
-        const data = await getRutas();
-        setRutas(data);
-        if (data.length > 0) {
-          setSelected(data[0]);
+        const { data, error } = await supabase.from('routes').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        const rows = (data ?? []) as Ruta[];
+        setRutas(rows);
+        if (rows.length > 0) {
+          setSelected(rows[0]);
         }
       } catch (err) {
         console.error('Error cargando rutas:', err);
@@ -55,7 +84,7 @@ export function RutasView({ onNavigate }: Props) {
       }
     };
     loadRutas();
-  }, []);
+  }, [supabase]);
 
   const filtered = rutas.filter(r => {
     if (tab === 'standard' && r.tipo !== 'standard') return false;
@@ -78,9 +107,10 @@ export function RutasView({ onNavigate }: Props) {
   };
 
   const handleDeleteRuta = async (id: string) => {
+    if (!supabase) return;
     if (!confirm('¿Estás seguro de eliminar esta ruta?')) return;
     try {
-      await deleteRuta(id);
+      await supabase.from('routes').delete().eq('id', id);
       setRutas(rutas.filter(r => r.id !== id));
       if (selected?.id === id) {
         setSelected(null);

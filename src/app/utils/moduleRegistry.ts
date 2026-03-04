@@ -35,7 +35,7 @@ export const SECTION_TO_MODULE_IDS: Partial<Record<MainSection, string[]>> =
 export const BUILT_MODULE_IDS = new Set<string>(
   MODULE_MANIFEST
     .filter(e => e.isReal)
-    .flatMap(e => e.checklistIds)
+    .map(e => e.section)
 );
 
 /**
@@ -46,7 +46,7 @@ export const BUILT_MODULE_IDS = new Set<string>(
 export const SUPABASE_MODULE_IDS = new Set<string>(
   MODULE_MANIFEST
     .filter(e => e.isReal && e.hasSupabase === true)
-    .flatMap(e => e.checklistIds)
+    .map(e => e.section)
 );
 
 /** true si la sección tiene una entrada en el manifest */

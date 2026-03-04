@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { HubView, HubCardDef, HubComingSoonItem } from '../HubView';
 import type { MainSection } from '../../../AdminDashboard';
+import { useOrchestrator } from '../../OrchestratorShell';
 import {
   Truck, Map, Users, Package, ShoppingCart, Navigation,
   CheckCircle, Layers, TrendingUp, Clock, MapPin, BarChart2,
@@ -12,7 +13,11 @@ interface Props { onNavigate: (s: MainSection) => void; }
 export function LogisticaView({ onNavigate }: Props) {
   const nav = (s: MainSection) => () => onNavigate(s);
 
-  const cards: HubCardDef[] = [
+  const { config } = useOrchestrator();
+  const modulosConfig = config?.modulos ?? [];
+  const todosHabilitados = modulosConfig.includes('*');
+
+  const todasLasCards: HubCardDef[] = [
     {
       id: 'envios', icon: Truck, onClick: nav('envios'),
       gradient: 'linear-gradient(135deg, #FF6835 0%, #e04e20 100%)', color: '#FF6835',
@@ -98,6 +103,13 @@ export function LogisticaView({ onNavigate }: Props) {
       stats: [{ icon: Users, value: '—', label: 'Consultas' }, { icon: Star, value: '—', label: 'Satisfacción' }, { icon: CheckCircle, value: '—', label: 'Entregados' }],
     },
   ];
+
+  const cards = useMemo(() => {
+    return todasLasCards.filter(card => {
+      if (todosHabilitados || modulosConfig.length === 0) return true;
+      return modulosConfig.includes(card.id);
+    });
+  }, [modulosConfig, todosHabilitados]);
 
   const comingSoon: HubComingSoonItem[] = [
     { icon: TrendingUp, label: 'Optimizador IA',     desc: 'Optimización de rutas con inteligencia artificial' },

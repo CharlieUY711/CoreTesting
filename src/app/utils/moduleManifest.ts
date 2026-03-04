@@ -126,7 +126,7 @@ export const MODULE_MANIFEST: ManifestEntry[] = [
     checklistIds: ['ecommerce-pedidos'],
     section: 'pedidos',
     viewFile: 'PedidosView.tsx',
-    component: React.lazy(() => import('../components/admin/views/PedidosView').then(m => ({ default: m.PedidosView }))),
+    component: React.lazy(() => import('../../modules/pedidos/ui/views/PedidosView').then(m => ({ default: m.PedidosView }))),
     isReal: true,
     hasSupabase: true,
     notes: 'CRUD de pedidos con estados, filtros y árbol madre/hijos',
@@ -185,7 +185,7 @@ export const MODULE_MANIFEST: ManifestEntry[] = [
     viewFile: 'TransportistasView.tsx',
     component: React.lazy(() => import('../components/admin/views/TransportistasView').then(m => ({ default: m.TransportistasView }))),
     isReal: true,
-    hasSupabase: false,
+    hasSupabase: true,
     notes: 'Catálogo carriers · tramos y zonas · simulador de tarifas',
   },
   {
@@ -194,7 +194,7 @@ export const MODULE_MANIFEST: ManifestEntry[] = [
     viewFile: 'RutasView.tsx',
     component: React.lazy(() => import('../components/admin/views/RutasView').then(m => ({ default: m.RutasView }))),
     isReal: true,
-    hasSupabase: false,
+    hasSupabase: true,
     notes: 'Rutas standard y por proyecto · vista detalle con paradas · progreso de entrega',
   },
   {
@@ -243,7 +243,7 @@ export const MODULE_MANIFEST: ManifestEntry[] = [
     viewFile: 'FulfillmentView.tsx',
     component: React.lazy(() => import('../components/admin/views/FulfillmentView').then(m => ({ default: m.FulfillmentView }))),
     isReal: true,
-    hasSupabase: false,
+    hasSupabase: true,
     notes: 'Wave picking · lotes · cola de órdenes · empaque · materiales de packaging',
   },
   {
@@ -252,7 +252,7 @@ export const MODULE_MANIFEST: ManifestEntry[] = [
     viewFile: 'ProduccionView.tsx',
     component: React.lazy(() => import('../components/admin/views/ProduccionView').then(m => ({ default: m.ProduccionView }))),
     isReal: true,
-    hasSupabase: false,
+    hasSupabase: true,
     notes: 'BOM · órdenes de armado · catálogo de kits / canastas / combos / packs',
   },
   {
@@ -261,7 +261,7 @@ export const MODULE_MANIFEST: ManifestEntry[] = [
     viewFile: 'AbastecimientoView.tsx',
     component: React.lazy(() => import('../components/admin/views/AbastecimientoView').then(m => ({ default: m.AbastecimientoView }))),
     isReal: true,
-    hasSupabase: false,
+    hasSupabase: true,
     notes: 'Alertas de stock · OC sugeridas · MRP con cálculo de componentes necesarios',
   },
   {
@@ -271,7 +271,7 @@ export const MODULE_MANIFEST: ManifestEntry[] = [
     component: React.lazy(() => import('../components/admin/views/MapaEnviosView').then(m => ({ default: m.MapaEnviosView }))),
     isReal: true,
     hasSupabase: false,
-    notes: 'Mapa SVG de Argentina con puntos de envíos activos · filtro por estado · tooltip detalle',
+    notes: 'Mapa SVG de Uruguay con puntos de envíos activos · filtro por estado · tooltip detalle',
   },
   {
     checklistIds: ['logistics-tracking'],

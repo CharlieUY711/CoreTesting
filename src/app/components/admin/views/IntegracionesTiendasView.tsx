@@ -32,7 +32,7 @@ const PLATFORMS: Platform[] = [
   },
   {
     id: 'tiendanube', emoji: '☁️', name: 'TiendaNube',
-    description: 'Plataforma de eCommerce líder en Argentina y Uruguay. Webhooks en tiempo real.',
+    description: 'Plataforma de eCommerce líder en Uruguay y Latam. Webhooks en tiempo real.',
     countries: ['🇺🇾', '🇦🇷'], status: 'pending',
     syncFeatures: ['Productos', 'Stock', 'Pedidos', 'Clientes'],
     category: 'platform', docsUrl: 'https://tiendanube.com/api-developers',
